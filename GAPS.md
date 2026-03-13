@@ -345,10 +345,11 @@ Other: `usage-limits/.pytest_cache`, `usage-limits/.ruff_cache`
 
 `opencode-plugin-prompt-transformer/src/index.ts` violates the standalone repo requirement:
 
-- `AI_ROOT` defaults to `resolve(_dir, "../../../ai")` — a relative path that implicitly depends on the `ai-prompts` sibling repo being present at a fixed location on disk
-- `RESPONSE_TEMPLATE_PATH` is derived from `AI_ROOT`, meaning the plugin cannot be installed or run without a co-located `ai-prompts` clone
+- `AI_ROOT` defaults to `resolve(_dir, "../../../ai")` — reads template files directly from a local `ai-prompts` clone via filesystem path
+- `ai-prompts` is a standalone package that exposes a remote CLI (`ai-prompts get <slug>`) specifically so consumers do not need a local clone
+- The plugin is bypassing this interface entirely, coupling itself to a co-located checkout
 
-**Fix:** Remove the `../../../ai` default. Require `AI_ROOT` or `PROMPTS_DIR` to be set explicitly; throw with a clear error if absent. Document the requirement in the README env var table.
+**Fix:** Remove `AI_ROOT` and `RESPONSE_TEMPLATE_PATH`. Fetch the template via `ai-prompts get <slug>` (CLI subprocess or declared package dependency). No local path resolution.
 
 ---
 
