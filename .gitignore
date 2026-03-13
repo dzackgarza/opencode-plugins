@@ -49,3 +49,9 @@
 **/package-lock.json
 **/yarn.lock
 **/pnpm-lock.yaml
+
+# Debug databases and test artifacts at root level
+.debug_db/
+.test_*
+.tmp_db*
+*.debug.json
