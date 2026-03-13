@@ -359,7 +359,10 @@ Other: `usage-limits/.pytest_cache`, `usage-limits/.ruff_cache`
 
 `tests/behavior/run.sh` reads the tier from this log rather than parsing the transcript, which is the wrong data source — the transcript is the canonical output of a session.
 
-**Fix:** Remove `appendLog`, `LOG_PATH`, and `PROMPT_TRANSFORMER_LOG_PATH`. Update `run.sh` to extract the tier from the rendered template metadata in the transcript output instead.
+**Fix:**
+- Update the `response_template.md` in `ai-prompts` to render the tier in a parseable metadata block (e.g. a structured comment or frontmatter line like `<!-- tier: {{ tier }} -->`) so it appears reliably in the injected text
+- Remove `appendLog`, `LOG_PATH`, and `PROMPT_TRANSFORMER_LOG_PATH` from `src/index.ts`
+- Update `run.sh` to extract the tier by parsing that metadata from the transcript stdout instead of reading from the log file
 
 ---
 
