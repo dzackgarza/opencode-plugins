@@ -1,0 +1,51 @@
+# Node.js dependencies (all directories)
+**/node_modules/
+
+# Python virtual environments (all directories)
+**/.venv/
+**/env/
+**/venv/
+**/ENV/
+
+# Build artifacts (all directories)
+**/dist/
+**/build/
+**/out/
+**/*.js.map
+**/*.d.ts
+**/*.d.ts.map
+**/.cache/
+
+# Test coverage (all directories)
+**/coverage/
+**/*.lcov
+**/.nyc_output/
+
+# Temporary files (all directories)
+**/*.tmp
+**/*.temp
+**/*.log
+**/*.pid
+**/*.seed
+**/*.pid.lock
+**/*.sock
+
+# Environment variables (all directories)
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+**/.env.*.local
+**/.env*.local
+**/*.env
+!**/.env.example
+
+# Package manager files (all directories)
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+**/package-lock.json
+**/yarn.lock
+**/pnpm-lock.yaml

@@ -1,0 +1,12 @@
+2026-03-09 11:34:12.266 UTC [3958107] LOG:  starting PostgreSQL 16.2 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 10.2.1 20210130 (Red Hat 10.2.1-11), 64-bit
+2026-03-09 11:34:12.268 UTC [3958107] LOG:  listening on Unix socket "/home/dzack/opencode-plugins/.test_psql/.s.PGSQL.5432"
+2026-03-09 11:34:12.295 UTC [3958111] LOG:  database system was shut down at 2026-03-09 11:34:12 UTC
+2026-03-09 11:34:12.303 UTC [3958107] LOG:  database system is ready to accept connections
+2026-03-09 11:34:12.619 UTC [3958107] LOG:  server process (PID 3958117) was terminated by signal 4: Illegal instruction
+2026-03-09 11:34:12.619 UTC [3958107] DETAIL:  Failed process was running: CREATE EXTENSION IF NOT EXISTS vector
+2026-03-09 11:34:12.619 UTC [3958107] LOG:  terminating any other active server processes
+2026-03-09 11:34:12.620 UTC [3958107] LOG:  all server processes terminated; reinitializing
+2026-03-09 11:34:12.644 UTC [3958107] LOG:  received fast shutdown request
+2026-03-09 11:34:12.644 UTC [3958120] LOG:  database system was interrupted; last known up at 2026-03-09 11:34:12 UTC
+2026-03-09 11:34:12.770 UTC [3958120] LOG:  database system was not properly shut down; automatic recovery in progress
+2026-03-09 11:34:12.773 UTC [3958120] LOG:  redo starts at 0/14807E0

@@ -1,0 +1,11 @@
+2026-03-09 11:14:47.057 UTC [3721345] LOG:  starting PostgreSQL 16.2 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 10.2.1 20210130 (Red Hat 10.2.1-11), 64-bit
+2026-03-09 11:14:47.058 UTC [3721345] LOG:  listening on Unix socket "/home/dzack/opencode-plugins/.tmp_db_no_vec/.s.PGSQL.5432"
+2026-03-09 11:14:47.064 UTC [3721348] LOG:  database system was shut down at 2026-03-09 11:14:46 UTC
+2026-03-09 11:14:47.068 UTC [3721345] LOG:  database system is ready to accept connections
+2026-03-09 11:14:47.145 UTC [3721345] LOG:  received fast shutdown request
+2026-03-09 11:14:47.146 UTC [3721345] LOG:  aborting any active transactions
+2026-03-09 11:14:47.147 UTC [3721345] LOG:  background worker "logical replication launcher" (PID 3721351) exited with exit code 1
+2026-03-09 11:14:47.147 UTC [3721346] LOG:  shutting down
+2026-03-09 11:14:47.148 UTC [3721346] LOG:  checkpoint starting: shutdown immediate
+2026-03-09 11:14:47.155 UTC [3721346] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.003 s, sync=0.001 s, total=0.008 s; sync files=2, longest=0.001 s, average=0.001 s; distance=0 kB, estimate=0 kB; lsn=0/14807E0, redo lsn=0/14807E0
+2026-03-09 11:14:47.160 UTC [3721345] LOG:  database system is shut down

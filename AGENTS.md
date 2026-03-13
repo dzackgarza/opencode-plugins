@@ -1,0 +1,1 @@
+/home/dzack/ai/prompts/local_context/opencode_plugin_development.md
