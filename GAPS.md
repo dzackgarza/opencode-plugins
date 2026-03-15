@@ -70,15 +70,15 @@ Generated from audit against `REPO_AUDIT.md`. All violations require remediation
 | `usage-limits` | `.venv/lib/.../direct_url.json` | `/home/dzack/opencode-plugins/...` |
 | `usage-limits` | `qwen_debug.json` (93MB) | extensive `/home/dzack/` paths — delete this file |
 
-**Fix:** Replace with env vars (`$OPENCODE_BIN`, `$PWD`, etc.) or remove debug files.
+**Fix:** Replace with PATH-resolved `opencode`, `$PWD`, and other non-user-specific paths, or remove debug files. Do not add repo-local binary-path override knobs such as `OPENCODE_BIN`.
 
 ---
 
 ## HIGH
 
-### Tests: no zero-knowledge proof (UUID nonce) in any integration test
+### Tests: liveness claims are not bound to run-specific witnesses
 
-None of the integration tests generate a per-run nonce. All rely on passphrase alone, which does not prove the tool executed live (a cached or hallucinated response containing the passphrase would pass).
+None of the integration tests listed below bind their proof to a fresh per-run witness or other run-bound hidden external witness. A fixed witness token can still prove execution if it first appears only on the proved path, but it does not by itself prove liveness, fresh retrieval, or another per-run guarantee if the same token could be replayed, cached, or hallucinated.
 
 | Repo | Test file |
 |---|---|
@@ -89,7 +89,7 @@ None of the integration tests generate a per-run nonce. All rely on passphrase a
 | `opencode-postgres-memory-plugin` | `tests/integration/postgres-memory-plugin.test.ts` |
 | `opencode-time-travel-plugin` | `tests/integration/time-travel-plugin.test.ts` |
 
-**Fix:** Add `import { randomUUID } from "node:crypto"`. Generate `nonce = randomUUID()` per test, inject into prompt, assert `expect(transcript).toContain(nonce)`.
+**Fix:** For any test that claims liveness, fresh retrieval, callback delivery, or another per-run property, add `import { randomUUID } from "node:crypto"` or another run-bound hidden witness source. Bind that witness to data or an external effect that the agent can access only through the proved path, and assert `expect(transcript).toContain(witness)` or the equivalent external side effect. Do not inject the execution witness into the prompt.
 
 ---
 
