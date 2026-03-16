@@ -1,12 +1,10 @@
 """Improved Jules CLI - Streamlined workflow."""
 
-from typing import Optional
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from improved_jules_cli.api import JulesAPI
-from improved_jules_cli.polling import watch_session
 from improved_jules_cli.config import (
     get_api_key,
     set_api_key,
@@ -54,13 +52,24 @@ def create(prompt: str):
 
 
 @app.command()
-def watch(session_id: str, timeout: Optional[int] = None):
-    """Poll until session completes."""
-    console.print(f"Watching {session_id}...")
-    result = watch_session(get_client(), session_id, interval=5, timeout=timeout)
-    state = result.get("state")
-    color = "green" if state == "COMPLETED" else "red"
+def watch(session_id: str):
+    """Check session status once."""
+    client = get_client()
+    session = client.get_session(session_id)
+    state = session.get("state")
+    color = (
+        "green" if state == "COMPLETED" else "red" if state == "FAILED" else "yellow"
+    )
     console.print(f"[{color}]{state}[/{color}]")
+
+
+@app.command()
+def watch_callback(session_id: str, callback: str):
+    """Poll until done, then run callback."""
+    from improved_jules_cli.polling import watch_with_callback
+
+    result = watch_with_callback(get_client(), session_id, callback, interval=5)
+    console.print("[green]Done, callback executed[/green]")
 
 
 @app.command()
