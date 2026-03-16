@@ -20,6 +20,47 @@ console = Console()
 TERMINAL_STATES = {"COMPLETED", "FAILED", "CANCELLED"}
 
 
+@app.command()
+def help():
+    """Show workflow documentation."""
+    console.print("""
+[bold]Jules CLI - Workflow[/bold]
+
+[green]1. Create[/green]
+    jules-cli create "Fix issue #123"
+    → Fires off agent that creates a PR
+
+[green]2. Wait[/green]
+    jules-cli watch-callback 123 "my-callback.sh"
+    → Polls until done, runs callback with env vars:
+      JULES_SESSION_ID, JULES_STATE, JULES_URL, JULES_PR_URL
+
+    Or manually:
+    jules-cli watch 123         # Check status once
+    jules-cli list             # List all sessions
+
+[green]3. Get PR[/green]
+    jules-cli pr 123
+    → Returns PR URL or pending changeset
+
+[green]4. Review[/green]
+    → Check PR at JULES_PR_URL
+    → If issues found:
+
+[green]5. Feedback[/green]
+    jules-cli re-prompt 123 "Review says: fix the tests"
+    → Feeds back to agent for more work
+
+[green]6. Clean up[/green]
+    jules-cli delete 123
+    → Removes session when done
+
+[bold]Setup (once):[/bold]
+    jules-cli config-set-prompt-template ~/jules-prompt.txt
+    → Prepends standardized instructions to every prompt
+""")
+
+
 def get_client() -> JulesAPI:
     try:
         return JulesAPI(get_api_key())
@@ -98,11 +139,12 @@ def pr(session_id: str):
     console.print("[yellow]No PR found[/yellow]")
 
 
-@app.command()
-def re_prompt(session_id: str, feedback: str):
+@app.command(name="feedback")
+@app.command(name="re-prompt")
+def send_feedback(session_id: str, message: str):
     """Send feedback to session for more work."""
     client = get_client()
-    client.send_message(session_id, feedback)
+    client.send_message(session_id, message)
     console.print(f"[green]Feedback sent to {session_id}[/green]")
 
 
