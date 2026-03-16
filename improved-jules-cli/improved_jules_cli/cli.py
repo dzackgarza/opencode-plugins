@@ -181,15 +181,15 @@ def status(session_id: str):
     """Quick status check."""
     client = get_client()
     session = client.get_session(session_id)
-    state = session.get("state", "UNKNOWN")
+    state = session.get("state")
     color = (
         "green" if state == "COMPLETED" else "red" if state == "FAILED" else "yellow"
     )
     console.print(f"[{color}]{state}[/{color}]")
 
 
-# Config commands (minimal)
-@app.command()
+# Config commands (hidden - one-time setup only)
+@app.command(hidden=True)
 def config_show():
     """Show configuration."""
     try:
@@ -202,14 +202,14 @@ def config_show():
     console.print(f"Prompt template: {template}")
 
 
-@app.command()
+@app.command(hidden=True)
 def config_set_prompt_template(path: str):
     """Set standardized prompt template file."""
     set_prompt_template_path(path)
     console.print(f"[green]Prompt template:[/green] {path}")
 
 
-@app.command()
+@app.command(hidden=True)
 def config_set_api_key(key: str):
     """Set API key."""
     set_api_key(key)
