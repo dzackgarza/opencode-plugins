@@ -2,6 +2,7 @@
 
 import os
 import json
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -50,7 +51,28 @@ def set_api_key(key: str):
 
 
 def get_prompt_template() -> Optional[str]:
+    """Get prompt template from config or from ai-prompts."""
     config = load_config()
+
+    # Check for ai-prompts slug
+    prompt_slug = config.get("prompt_slug")
+    if prompt_slug:
+        try:
+            result = subprocess.run(
+                ["uvx", "ai-prompts", "get", prompt_slug],
+                capture_output=True,
+                text=True,
+                cwd=os.environ.get(
+                    "AI_PROMPTS_DIR", "/home/dzack/opencode-plugins/ai-prompts"
+                ),
+                env={**os.environ, "PROMPTS_DIR": "prompts"},
+            )
+            if result.returncode == 0:
+                return result.stdout
+        except Exception:
+            pass
+
+    # Fallback to file path
     template_path = config.get("prompt_template_path")
     if not template_path:
         return None
@@ -65,4 +87,11 @@ def get_prompt_template() -> Optional[str]:
 def set_prompt_template_path(path: str):
     config = load_config()
     config["prompt_template_path"] = path
+    save_config(config)
+
+
+def set_prompt_slug(slug: str):
+    """Set ai-prompts slug for prompt template."""
+    config = load_config()
+    config["prompt_slug"] = slug
     save_config(config)

@@ -10,7 +10,7 @@ from improved_jules_cli.config import (
     set_api_key,
     ConfigError,
     get_prompt_template,
-    set_prompt_template_path,
+    set_prompt_slug,
     load_config,
 )
 
@@ -198,15 +198,17 @@ def config_show():
         console.print("[red]API key not set[/red]")
 
     cfg = load_config()
-    template = cfg.get("prompt_template_path", "(not set)")
-    console.print(f"Prompt template: {template}")
+    slug = cfg.get("prompt_slug", "(not set)")
+    path = cfg.get("prompt_template_path", "(not set)")
+    console.print(f"Prompt slug: {slug}")
+    console.print(f"Prompt file: {path}")
 
 
 @app.command(hidden=True)
-def config_set_prompt_template(path: str):
-    """Set standardized prompt template file."""
-    set_prompt_template_path(path)
-    console.print(f"[green]Prompt template:[/green] {path}")
+def config_set_prompt_slug(slug: str):
+    """Set ai-prompts slug for prompt template."""
+    set_prompt_slug(slug)
+    console.print(f"[green]Prompt slug:[/green] {slug}")
 
 
 @app.command(hidden=True)
