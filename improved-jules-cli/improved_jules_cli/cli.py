@@ -48,7 +48,7 @@ def help():
     → If issues found:
 
 [green]5. Feedback[/green]
-    jules-cli re-prompt 123 "Review says: fix the tests"
+    jules-cli feedback 123 "Review says: fix the tests"
     → Feeds back to agent for more work
 
 [green]6. Clean up[/green]
@@ -139,9 +139,8 @@ def pr(session_id: str):
     console.print("[yellow]No PR found[/yellow]")
 
 
-@app.command(name="feedback")
-@app.command(name="re-prompt")
-def send_feedback(session_id: str, message: str):
+@app.command()
+def feedback(session_id: str, message: str):
     """Send feedback to session for more work."""
     client = get_client()
     client.send_message(session_id, message)
