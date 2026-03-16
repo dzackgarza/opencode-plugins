@@ -65,7 +65,7 @@ def watch(session_id: str, timeout: Optional[int] = None):
 
 @app.command()
 def pr(session_id: str):
-    """Get PR URL from completed session."""
+    """Get PR URL or changeset from completed session."""
     client = get_client()
     session = client.get_session(session_id)
 
@@ -78,6 +78,12 @@ def pr(session_id: str):
         if "pullRequest" in out:
             pr = out["pullRequest"]
             console.print(pr.get("url", ""))
+            return
+        if "changeSet" in out:
+            cs = out["changeSet"]
+            patch = cs.get("gitPatch", {})
+            console.print("[yellow]Changes pending PR:[/yellow]")
+            console.print(patch.get("suggestedCommitMessage", ""))
             return
 
     console.print("[yellow]No PR found[/yellow]")
