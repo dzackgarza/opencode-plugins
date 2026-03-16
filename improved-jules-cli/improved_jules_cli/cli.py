@@ -76,9 +76,9 @@ def create(prompt: str):
 
     # Prepend standardized prompt template if configured
     try:
-        template = get_prompt_template()
+        template = get_prompt_template(prompt)
         if template:
-            prompt = f"{template}\n\n---\n\n{prompt}"
+            prompt = f"{template}\n\n---\n\nTask: {prompt}"
     except ConfigError as e:
         console.print(f"[yellow]Warning:[/yellow] {e}")
 
@@ -186,6 +186,16 @@ def status(session_id: str):
         "green" if state == "COMPLETED" else "red" if state == "FAILED" else "yellow"
     )
     console.print(f"[{color}]{state}[/{color}]")
+
+
+@app.command()
+def get(session_id: str):
+    """Get session details."""
+    client = get_client()
+    session = client.get_session(session_id)
+    console.print(f"[cyan]ID:[/cyan] {session.get('id')}")
+    console.print(f"[cyan]State:[/cyan] {session.get('state')}")
+    console.print(f"[cyan]Prompt:[/cyan] {session.get('prompt', '')[:500]}...")
 
 
 # Config commands (hidden - one-time setup only)

@@ -1,13 +1,17 @@
 """Improved Jules CLI - Configuration."""
 
-import os
 import json
-import subprocess
+import os
 from pathlib import Path
 from typing import Optional
 
 CONFIG_DIR = Path.home() / ".config" / "improved-jules-cli"
 CONFIG_FILE = CONFIG_DIR / "config.json"
+
+# Default ai-prompts directory
+AI_PROMPTS_DIR = os.environ.get(
+    "AI_PROMPTS_DIR", "/home/dzack/opencode-plugins/ai-prompts"
+)
 
 
 class ConfigError(Exception):
@@ -50,27 +54,14 @@ def set_api_key(key: str):
     save_config(config)
 
 
-def get_prompt_template() -> Optional[str]:
-    """Get prompt template from config or from ai-prompts."""
+def get_prompt_template(task: str) -> Optional[str]:
+    """Get prompt template and render with task binding via templating engine."""
     config = load_config()
 
     # Check for ai-prompts slug
     prompt_slug = config.get("prompt_slug")
     if prompt_slug:
-        try:
-            result = subprocess.run(
-                ["uvx", "ai-prompts", "get", prompt_slug],
-                capture_output=True,
-                text=True,
-                cwd=os.environ.get(
-                    "AI_PROMPTS_DIR", "/home/dzack/opencode-plugins/ai-prompts"
-                ),
-                env={**os.environ, "PROMPTS_DIR": "prompts"},
-            )
-            if result.returncode == 0:
-                return result.stdout
-        except Exception:
-            pass
+        return _render_template_from_slug(prompt_slug, task)
 
     # Fallback to file path
     template_path = config.get("prompt_template_path")
@@ -81,7 +72,39 @@ def get_prompt_template() -> Optional[str]:
     if not path.exists():
         raise ConfigError(f"Prompt template not found: {template_path}")
 
-    return path.read_text()
+    # Render file as template with task
+    template = path.read_text()
+    return template.replace("{{ task }}", task).replace("{{task}}", task)
+
+
+def _render_template_from_slug(slug: str, task: str) -> str:
+    """Render template from ai-prompts slug using simple string replacement."""
+    import sys
+
+    # Add ai-prompts to path for imports
+    ai_prompts_path = Path(AI_PROMPTS_DIR)
+    if str(ai_prompts_path / "src") not in sys.path:
+        sys.path.insert(0, str(ai_prompts_path / "src"))
+
+    # Set PROMPTS_DIR for ai_prompts catalog
+    original_prompts_dir = os.environ.get("PROMPTS_DIR")
+    os.environ["PROMPTS_DIR"] = str(ai_prompts_path / "prompts")
+
+    try:
+        from ai_prompts.catalog import get_prompt
+
+        prompt = get_prompt(slug)
+        # Use simple string replacement for {{ task }} placeholder
+        return prompt.text.replace("{{ task }}", task).replace("{{task}}", task)
+    except Exception:
+        # Fallback: just return task
+        return task
+    finally:
+        # Restore original PROMPTS_DIR
+        if original_prompts_dir is None:
+            os.environ.pop("PROMPTS_DIR", None)
+        else:
+            os.environ["PROMPTS_DIR"] = original_prompts_dir
 
 
 def set_prompt_template_path(path: str):
