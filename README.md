@@ -30,6 +30,19 @@ Current migration worktrees:
 - `opencode-time-travel-plugin` → `/home/dzack/.worktrees/opencode-plugins/opencode-time-travel-plugin/migration-cli-first-architecture`
 - `opencode-zotero-plugin` → `/home/dzack/.worktrees/opencode-plugins/opencode-zotero-plugin/migration-cli-first-architecture`
 
+Clean-clone fallback roots for damaged repos:
+
+- `opencode-postgres-memory-plugin` → `/home/dzack/.worktrees/opencode-plugins-clean/opencode-postgres-memory-plugin/repo`
+
+Current Codex migration sessions:
+
+- `opencode-zotero-plugin` PR remediation → session `27118`
+- clean `opencode-postgres-memory-plugin` re-land → session `31185`
+- `opencode-time-travel-plugin` continuation → session `92207`
+- earlier session ids above are stale and should not be resumed
+
+If orchestration context is lost, poll these session ids directly before starting a replacement run.
+
 Legacy top-level worktrees still present in this repo:
 
 - `/home/dzack/opencode-plugins/.worktrees/improved-webtools-live-reddit`

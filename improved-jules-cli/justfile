@@ -1,0 +1,30 @@
+# Improved Jules CLI
+
+# Install the package in dev mode
+install:
+    uv pip install -e .
+
+# Set API key
+set-key:
+    @echo "Run: jules-cli config-set-api-key YOUR_API_KEY"
+    @echo "Or set JULES_API_KEY env var"
+
+# List sessions
+list:
+    jules-cli list
+
+# Watch a session
+watch ID:
+    jules-cli watch {{ID}}
+
+# Re-prompt a session  
+reprompt ID MESSAGE:
+    jules-cli re-prompt {{ID}} "{{MESSAGE}}"
+
+# Run tests
+test:
+    echo "No tests yet"
+
+# Lint
+lint:
+    echo "No linter configured"

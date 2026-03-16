@@ -1,0 +1,21 @@
+[project]
+name = "improved-jules-cli"
+version = "0.1.0"
+description = "Enhanced Jules CLI with polling, callbacks, and API access"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.12.5",
+    "requests>=2.32.5",
+    "typer>=0.24.1",
+    "rich>=14.0.0",
+]
+
+[project.scripts]
+jules-cli = "improved_jules_cli.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = []
