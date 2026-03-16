@@ -157,7 +157,7 @@ def delete(session_id: str):
 
 @app.command()
 def list(limit: int = 20):
-    """List recent sessions."""
+    """List all sessions."""
     client = get_client()
     resp = client.list_sessions(page_size=limit)
     sessions = resp.get("sessions", [])
