@@ -3,6 +3,7 @@
 import os
 import json
 from pathlib import Path
+from typing import Optional
 
 CONFIG_DIR = Path.home() / ".config" / "improved-jules-cli"
 CONFIG_FILE = CONFIG_DIR / "config.json"
@@ -56,4 +57,38 @@ def set_api_key(key: str):
     """Save API key to config."""
     config = load_config()
     config["api_key"] = key
+    save_config(config)
+
+
+def get_prompt_template() -> Optional[str]:
+    """Get prompt template from config file."""
+    config = load_config()
+    template_path = config.get("prompt_template_path")
+    if not template_path:
+        return None
+
+    path = Path(template_path)
+    if not path.exists():
+        raise ConfigError(f"Prompt template not found: {template_path}")
+
+    return path.read_text()
+
+
+def get_branch_prefix() -> Optional[str]:
+    """Get branch prefix from config."""
+    config = load_config()
+    return config.get("branch_prefix")
+
+
+def set_prompt_template_path(path: str):
+    """Set prompt template path."""
+    config = load_config()
+    config["prompt_template_path"] = path
+    save_config(config)
+
+
+def set_branch_prefix(prefix: str):
+    """Set branch prefix."""
+    config = load_config()
+    config["branch_prefix"] = prefix
     save_config(config)

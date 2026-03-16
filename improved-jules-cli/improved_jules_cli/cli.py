@@ -1,5 +1,6 @@
 """Improved Jules CLI - Main CLI."""
 
+import time
 from typing import Optional
 import typer
 from rich.console import Console
@@ -7,7 +8,14 @@ from rich.table import Table
 
 from improved_jules_cli.api import JulesAPI
 from improved_jules_cli.polling import watch_session, watch_with_callback
-from improved_jules_cli.config import get_api_key, set_api_key, ConfigError
+from improved_jules_cli.config import (
+    get_api_key,
+    set_api_key,
+    ConfigError,
+    get_prompt_template,
+    set_prompt_template_path,
+    set_branch_prefix,
+)
 
 app = typer.Typer(
     name="jules-cli", help="Improved Jules CLI with polling and callbacks"
@@ -15,6 +23,39 @@ app = typer.Typer(
 console = Console()
 
 TERMINAL_STATES = {"COMPLETED", "FAILED", "CANCELLED"}
+
+
+def _wait_and_approve_plan(client: JulesAPI, session_id: str, timeout: int = 120):
+    """Wait for plan generation and approve it."""
+    # Give the session a moment to initialize
+    time.sleep(3)
+
+    start = time.time()
+    while time.time() - start < timeout:
+        # Check activities for planGenerated
+        try:
+            resp = client.list_activities(session_id, page_size=20)
+            activities = resp.get("activities", [])
+        except Exception as e:
+            console.print(
+                f"[yellow]Error fetching activities: {e}, retrying...[/yellow]"
+            )
+            time.sleep(2)
+            continue
+
+        has_plan = any("planGenerated" in a for a in activities)
+        if has_plan:
+            console.print("Plan generated, approving...")
+            try:
+                client.approve_plan(session_id)
+                console.print("[green]Plan approved[/green]")
+            except Exception as e:
+                console.print(f"[yellow]Warning: could not approve plan: {e}[/yellow]")
+            return
+
+        time.sleep(2)
+
+    console.print("[yellow]Timeout waiting for plan, manual approval required[/yellow]")
 
 
 def get_client() -> JulesAPI:
@@ -126,10 +167,26 @@ def create(
     prompt: str,
     title: Optional[str] = typer.Option(None, help="Session title"),
     auto_approve: bool = typer.Option(False, help="Auto-approve plan"),
+    auto_improve: bool = typer.Option(False, help="Auto-improve plan before execution"),
     auto_pr: bool = typer.Option(False, help="Auto-create PR"),
+    branch: Optional[str] = typer.Option(None, help="Branch name for the session"),
 ):
     """Create a new session."""
     client = get_client()
+
+    # Prepend prompt template if configured
+    try:
+        template = get_prompt_template()
+        if template:
+            prompt = f"{template}\n\n---\n\n{prompt}"
+    except ConfigError as e:
+        console.print(f"[yellow]Warning:[/yellow] {e}")
+
+    # Build source context with branch if provided
+    # Note: branch prefix from config is not yet working with Jules API
+    source_context = None
+    if branch:
+        source_context = {"repository": "default", "branch": branch}
 
     automation = "AUTO_CREATE_PR" if auto_pr else None
     session = client.create_session(
@@ -137,10 +194,17 @@ def create(
         title=title,
         require_plan_approval=not auto_approve,
         automation_mode=automation,
+        source_context=source_context,
     )
 
-    console.print(f"[green]Session created:[/green] {session.get('id')}")
+    session_id = session.get("id")
+    console.print(f"[green]Session created:[/green] {session_id}")
     console.print(f"URL: {session.get('url')}")
+
+    # Auto-improve: wait for plan, then approve
+    if auto_improve or auto_approve:
+        console.print("Waiting for plan generation...")
+        _wait_and_approve_plan(client, session_id)
 
 
 @app.command()
@@ -262,6 +326,49 @@ def config_show():
         console.print(f"API key: {key[:10]}..." if len(key) > 10 else key)
     except ConfigError as e:
         console.print(f"[red]Error:[/red] {e}")
+
+    # Show prompt template path
+    config = load_config()
+    template_path = config.get("prompt_template_path")
+    if template_path:
+        console.print(f"Prompt template: {template_path}")
+    else:
+        console.print("Prompt template: (not set)")
+
+    # Show branch prefix
+    branch_prefix = config.get("branch_prefix")
+    if branch_prefix:
+        console.print(f"Branch prefix: {branch_prefix}")
+    else:
+        console.print("Branch prefix: (not set)")
+
+
+def load_config() -> dict:
+    """Load config (helper for config_show)."""
+    import json
+    from pathlib import Path
+
+    CONFIG_FILE = Path.home() / ".config" / "improved-jules-cli" / "config.json"
+    if not CONFIG_FILE.exists():
+        return {}
+    try:
+        return json.loads(CONFIG_FILE.read_text())
+    except json.JSONDecodeError:
+        return {}
+
+
+@app.command()
+def config_set_prompt_template(path: str):
+    """Set prompt template file path."""
+    set_prompt_template_path(path)
+    console.print(f"[green]Prompt template path set to:[/green] {path}")
+
+
+@app.command()
+def config_set_branch_prefix(prefix: str):
+    """Set branch prefix for new sessions."""
+    set_branch_prefix(prefix)
+    console.print(f"[green]Branch prefix set to:[/green] {prefix}")
 
 
 if __name__ == "__main__":
