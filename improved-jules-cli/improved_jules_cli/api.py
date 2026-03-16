@@ -36,6 +36,11 @@ class JulesAPI:
             params["pageToken"] = page_token
         return self._request("GET", "/sessions", params=params)
 
+    # Sources
+    def list_sources(self) -> dict:
+        """List available sources."""
+        return self._request("GET", "/sources")
+
     def get_session(self, session_id: str) -> dict:
         return self._request("GET", f"/sessions/{session_id}")
 

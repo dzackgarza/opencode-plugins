@@ -86,6 +86,35 @@ def list(
 
 
 @app.command()
+def sources():
+    """List available sources (repos)."""
+    client = get_client()
+    resp = client.list_sources()
+    sources = resp.get("sources", [])
+
+    if not sources:
+        console.print("[yellow]No sources found[/yellow]")
+        return
+
+    table = Table(title="Jules Sources")
+    table.add_column("ID", style="cyan")
+    table.add_column("Owner", style="yellow")
+    table.add_column("Repo", style="yellow")
+    table.add_column("Default Branch")
+
+    for s in sources:
+        gh = s.get("githubRepo", {})
+        table.add_row(
+            s.get("id", ""),
+            gh.get("owner", ""),
+            gh.get("repo", ""),
+            gh.get("defaultBranch", {}).get("displayName", ""),
+        )
+
+    console.print(table)
+
+
+@app.command()
 def get(session_id: str):
     """Get session details."""
     client = get_client()
@@ -133,9 +162,11 @@ def create(
     prompt: str,
     title: Optional[str] = typer.Option(None, help="Session title"),
     auto_pr: bool = typer.Option(False, help="Auto-create PR"),
-    branch: Optional[str] = typer.Option(None, help="Branch name for the session"),
 ):
-    """Create a new session (plans are auto-approved)."""
+    """Create a new session (plans are auto-approved).
+
+    Note: Source/repo is configured in Jules dashboard.
+    """
     client = get_client()
 
     # Prepend prompt template if configured
@@ -146,17 +177,11 @@ def create(
     except ConfigError as e:
         console.print(f"[yellow]Warning:[/yellow] {e}")
 
-    # Build source context with branch if provided
-    source_context = None
-    if branch:
-        source_context = {"repository": "default", "branch": branch}
-
     session = client.create_session(
         prompt=prompt,
         title=title,
-        require_plan_approval=False,  # Always auto-approve
+        require_plan_approval=False,
         automation_mode="AUTO_CREATE_PR" if auto_pr else None,
-        source_context=source_context,
     )
 
     session_id = session.get("id")
