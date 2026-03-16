@@ -1,6 +1,5 @@
 """Improved Jules CLI - Main CLI."""
 
-import time
 from typing import Optional
 import typer
 from rich.console import Console
@@ -23,39 +22,6 @@ app = typer.Typer(
 console = Console()
 
 TERMINAL_STATES = {"COMPLETED", "FAILED", "CANCELLED"}
-
-
-def _wait_and_approve_plan(client: JulesAPI, session_id: str, timeout: int = 120):
-    """Wait for plan generation and approve it."""
-    # Give the session a moment to initialize
-    time.sleep(3)
-
-    start = time.time()
-    while time.time() - start < timeout:
-        # Check activities for planGenerated
-        try:
-            resp = client.list_activities(session_id, page_size=20)
-            activities = resp.get("activities", [])
-        except Exception as e:
-            console.print(
-                f"[yellow]Error fetching activities: {e}, retrying...[/yellow]"
-            )
-            time.sleep(2)
-            continue
-
-        has_plan = any("planGenerated" in a for a in activities)
-        if has_plan:
-            console.print("Plan generated, approving...")
-            try:
-                client.approve_plan(session_id)
-                console.print("[green]Plan approved[/green]")
-            except Exception as e:
-                console.print(f"[yellow]Warning: could not approve plan: {e}[/yellow]")
-            return
-
-        time.sleep(2)
-
-    console.print("[yellow]Timeout waiting for plan, manual approval required[/yellow]")
 
 
 def get_client() -> JulesAPI:
@@ -166,12 +132,10 @@ def delete(session_id: str):
 def create(
     prompt: str,
     title: Optional[str] = typer.Option(None, help="Session title"),
-    auto_approve: bool = typer.Option(False, help="Auto-approve plan"),
-    auto_improve: bool = typer.Option(False, help="Auto-improve plan before execution"),
     auto_pr: bool = typer.Option(False, help="Auto-create PR"),
     branch: Optional[str] = typer.Option(None, help="Branch name for the session"),
 ):
-    """Create a new session."""
+    """Create a new session (plans are auto-approved)."""
     client = get_client()
 
     # Prepend prompt template if configured
@@ -183,28 +147,21 @@ def create(
         console.print(f"[yellow]Warning:[/yellow] {e}")
 
     # Build source context with branch if provided
-    # Note: branch prefix from config is not yet working with Jules API
     source_context = None
     if branch:
         source_context = {"repository": "default", "branch": branch}
 
-    automation = "AUTO_CREATE_PR" if auto_pr else None
     session = client.create_session(
         prompt=prompt,
         title=title,
-        require_plan_approval=not auto_approve,
-        automation_mode=automation,
+        require_plan_approval=False,  # Always auto-approve
+        automation_mode="AUTO_CREATE_PR" if auto_pr else None,
         source_context=source_context,
     )
 
     session_id = session.get("id")
     console.print(f"[green]Session created:[/green] {session_id}")
     console.print(f"URL: {session.get('url')}")
-
-    # Auto-improve: wait for plan, then approve
-    if auto_improve or auto_approve:
-        console.print("Waiting for plan generation...")
-        _wait_and_approve_plan(client, session_id)
 
 
 @app.command()
