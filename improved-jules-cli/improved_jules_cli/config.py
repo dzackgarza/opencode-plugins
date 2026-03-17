@@ -54,14 +54,22 @@ def set_api_key(key: str):
     save_config(config)
 
 
-def get_prompt_template(task: str) -> Optional[str]:
-    """Get prompt template and render with task binding via templating engine."""
+def get_prompt_template(
+    task: str,
+    context_files: Optional[list[str]] = None,
+) -> Optional[str]:
+    """Get prompt template and render with task binding via templating engine.
+
+    Args:
+        task: The task/issue to render in the template
+        context_files: List of file paths to include as text_files bindings
+    """
     config = load_config()
 
     # Check for ai-prompts slug
     prompt_slug = config.get("prompt_slug")
     if prompt_slug:
-        return _render_template_from_slug(prompt_slug, task)
+        return _render_template_from_slug(prompt_slug, task, context_files)
 
     # Fallback to file path
     template_path = config.get("prompt_template_path")
@@ -77,13 +85,33 @@ def get_prompt_template(task: str) -> Optional[str]:
     return template.replace("{{ task }}", task).replace("{{task}}", task)
 
 
-def _render_template_from_slug(slug: str, task: str) -> str:
+def _render_template_from_slug(
+    slug: str,
+    task: str,
+    context_files: Optional[list[str]] = None,
+) -> str:
     """Render template from ai-prompts slug using templating engine CLI via uvx."""
     import subprocess
 
+    # Build bindings with additional-context for extra files
+    bindings = {"data": {"task": task}, "text_files": []}
+
+    if context_files:
+        # Read files and add as additional_context in data
+        context_content = []
+        for filepath in context_files:
+            try:
+                content = Path(filepath).read_text()
+                filename = Path(filepath).name
+                context_content.append(f"=== {filename} ===\n{content}")
+            except Exception:
+                pass
+        if context_content:
+            bindings["data"]["additional_context"] = "\n\n".join(context_content)
+
     request = {
         "template": {"path": f"prompts/{slug}.md"},
-        "bindings": {"data": {"task": task}},
+        "bindings": bindings,
         "options": {"render_mode": "document"},
     }
 

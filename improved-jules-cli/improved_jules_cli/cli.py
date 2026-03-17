@@ -90,10 +90,17 @@ def create(
         ..., "--repo", "-r", help="GitHub repo in format 'owner/repo'"
     ),
     branch: str = typer.Option("main", "--branch", "-b", help="Branch to work on"),
+    context: list[str] = typer.Option(
+        [],
+        "--context",
+        "-c",
+        help="Additional files to include as context (will be inlined into prompt)",
+    ),
 ):
     """Create a session from a GitHub issue that creates a PR (plans auto-approved).
 
     The issue title, body, and all comments are assembled into the prompt.
+    Use --context to attach additional files (e.g., --context README_STANDARDS.md).
     """
     client = get_client()
 
@@ -127,7 +134,9 @@ def create(
 
     # Prepend standardized prompt template if configured
     try:
-        template = get_prompt_template(prompt)
+        template = get_prompt_template(
+            prompt, context_files=context if context else None
+        )
         if template:
             prompt = f"{template}\n\n---\n\nTask:\n\n{prompt}"
     except ConfigError as e:
