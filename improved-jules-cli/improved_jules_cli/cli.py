@@ -13,7 +13,7 @@ from improved_jules_cli.config import (
     set_prompt_slug,
     load_config,
 )
-from improved_jules_cli.github import fetch_issue_markdown
+from improved_jules_cli.github import fetch_issue_markdown, parse_issue_url
 
 app = typer.Typer(name="jules-cli")
 console = Console()
@@ -84,11 +84,8 @@ def get_client() -> JulesAPI:
 
 @app.command()
 def create(
-    issue: int = typer.Option(
-        ..., "--issue", "-i", help="GitHub issue number to work on"
-    ),
-    repo: str = typer.Option(
-        ..., "--repo", "-r", help="GitHub repo in format 'owner/repo'"
+    issue_url: str = typer.Argument(
+        ..., help="GitHub issue URL (e.g., https://github.com/owner/repo/issues/123)"
     ),
     branch: str = typer.Option("main", "--branch", "-b", help="Branch to work on"),
     context: list[str] = typer.Option(
@@ -106,28 +103,29 @@ def create(
 ):
     """Create a session from a GitHub issue that creates a PR (plans auto-approved).
 
-    The issue title, body, and all comments are assembled into the prompt.
+    Pass a GitHub issue URL (e.g., https://github.com/owner/repo/issues/123).
     Use --context to attach additional files (e.g., --context README_STANDARDS.md).
     """
-    # Parse owner/repo early for dry-run
-    if "/" not in repo:
-        console.print("[red]Error:[/red] Repo must be in format 'owner/repo'")
+    # Parse issue URL
+    try:
+        owner, repo_name, issue_number = parse_issue_url(issue_url)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
-    owner, repo_name = repo.split("/", 1)
 
     # Dry run - fetch issue and print prompt without needing Jules auth
     if dry_run:
         console.print("[yellow]=== DRY RUN ===[/yellow]")
         console.print(f"[cyan]Repo:[/cyan] {owner}/{repo_name}")
+        console.print(f"[cyan]Issue URL:[/cyan] {issue_url}")
         console.print(f"[cyan]Branch:[/cyan] {branch or 'main'}")
-        console.print(f"[cyan]Issue:[/cyan] #{issue}")
         if context:
             console.print(f"[cyan]Context files:[/cyan] {', '.join(context)}")
 
         # Fetch issue
-        console.print(f"[cyan]Fetching issue #{issue}...[/cyan]")
+        console.print("[cyan]Fetching issue...[/cyan]")
         try:
-            prompt = fetch_issue_markdown(owner, repo_name, issue)
+            prompt = fetch_issue_markdown(owner, repo_name, issue_number)
         except RuntimeError as e:
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1)
@@ -154,7 +152,7 @@ def create(
     source = client.find_source_by_repo(owner, repo_name)
     if not source:
         console.print(
-            f"[red]Error:[/red] Repo '{repo}' not connected to Jules. Run 'jules remote list --repo' to see connected repos."
+            f"[red]Error:[/red] Repo '{owner}/{repo_name}' not connected to Jules. Run 'jules remote list --repo' to see connected repos."
         )
         raise typer.Exit(1)
 
@@ -165,9 +163,9 @@ def create(
     starting_branch = branch if branch else default_branch
 
     # Fetch issue and assemble into prompt
-    console.print(f"[cyan]Fetching issue #{issue} from {owner}/{repo_name}...[/cyan]")
+    console.print(f"[cyan]Fetching issue from {owner}/{repo_name}...[/cyan]")
     try:
-        prompt = fetch_issue_markdown(owner, repo_name, issue)
+        prompt = fetch_issue_markdown(owner, repo_name, issue_number)
     except RuntimeError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
@@ -181,19 +179,6 @@ def create(
             prompt = f"{template}\n\n---\n\nTask:\n\n{prompt}"
     except ConfigError as e:
         console.print(f"[yellow]Warning:[/yellow] {e}")
-
-    # Dry run - just print what would be sent
-    if dry_run:
-        console.print("[yellow]=== DRY RUN ===[/yellow]")
-        console.print(f"[cyan]Repo:[/cyan] {owner}/{repo_name}")
-        console.print(f"[cyan]Branch:[/cyan] {starting_branch}")
-        console.print(f"[cyan]Issue:[/cyan] #{issue}")
-        if context:
-            console.print(f"[cyan]Context files:[/cyan] {', '.join(context)}")
-        console.print()
-        console.print("[cyan]Prompt:[/cyan]")
-        console.print(prompt)
-        raise typer.Exit(0)
 
     # Build source context for the repo (API format)
     source_context = {

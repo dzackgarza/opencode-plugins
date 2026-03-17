@@ -1,6 +1,28 @@
 """Improved Jules CLI - GitHub issue fetching."""
 
+import re
 import subprocess
+from typing import Tuple
+
+
+def parse_issue_url(url: str) -> Tuple[str, str, int]:
+    """Parse GitHub issue URL into owner, repo, and issue number.
+
+    Examples:
+        https://github.com/owner/repo/issues/123
+        https://github.com/owner/repo/issues/123#issuecomment-456
+    """
+    # Match GitHub issue URLs
+    pattern = r"github\.com/([^/]+)/([^/]+)/issues/(\d+)"
+    match = re.search(pattern, url)
+    if not match:
+        raise ValueError(f"Invalid GitHub issue URL: {url}")
+
+    owner = match.group(1)
+    repo = match.group(2)
+    issue_number = int(match.group(3))
+
+    return owner, repo, issue_number
 
 
 def fetch_issue_markdown(owner: str, repo: str, issue_number: int) -> str:
