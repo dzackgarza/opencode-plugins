@@ -94,7 +94,7 @@ def _render_template_from_slug(
     import subprocess
 
     # Build bindings with additional_context for extra files
-    bindings = {"data": {"task": task}, "text_files": []}
+    bindings = {"data": {"task": task, "additional_context": []}, "text_files": []}
 
     if context_files:
         # Read files and format as list of {name, content}
