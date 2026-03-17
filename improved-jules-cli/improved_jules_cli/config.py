@@ -78,33 +78,38 @@ def get_prompt_template(task: str) -> Optional[str]:
 
 
 def _render_template_from_slug(slug: str, task: str) -> str:
-    """Render template from ai-prompts slug using simple string replacement."""
-    import sys
+    """Render template from ai-prompts slug using templating engine CLI via uvx."""
+    import subprocess
 
-    # Add ai-prompts to path for imports
-    ai_prompts_path = Path(AI_PROMPTS_DIR)
-    if str(ai_prompts_path / "src") not in sys.path:
-        sys.path.insert(0, str(ai_prompts_path / "src"))
-
-    # Set PROMPTS_DIR for ai_prompts catalog
-    original_prompts_dir = os.environ.get("PROMPTS_DIR")
-    os.environ["PROMPTS_DIR"] = str(ai_prompts_path / "prompts")
+    request = {
+        "template": {"path": f"prompts/{slug}.md"},
+        "bindings": {"data": {"task": task}},
+        "options": {"render_mode": "document"},
+    }
 
     try:
-        from ai_prompts.catalog import get_prompt
-
-        prompt = get_prompt(slug)
-        # Use simple string replacement for {{ task }} placeholder
-        return prompt.text.replace("{{ task }}", task).replace("{{task}}", task)
+        # Use uvx to run the templating engine
+        result = subprocess.run(
+            [
+                "uvx",
+                "--from",
+                "git+https://github.com/dzackgarza/llm-templating-engine.git",
+                "llm-template-render",
+            ],
+            input=json.dumps(request),
+            capture_output=True,
+            text=True,
+            cwd=AI_PROMPTS_DIR,
+            env={**os.environ, "PROMPTS_DIR": "prompts"},
+        )
+        if result.returncode == 0:
+            response = json.loads(result.stdout)
+            return response.get("rendered", {}).get("document", "")
     except Exception:
-        # Fallback: just return task
-        return task
-    finally:
-        # Restore original PROMPTS_DIR
-        if original_prompts_dir is None:
-            os.environ.pop("PROMPTS_DIR", None)
-        else:
-            os.environ["PROMPTS_DIR"] = original_prompts_dir
+        pass
+
+    # Fallback: just return task
+    return task
 
 
 def set_prompt_template_path(path: str):
