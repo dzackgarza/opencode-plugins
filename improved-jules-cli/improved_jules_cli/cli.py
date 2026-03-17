@@ -36,8 +36,8 @@ Jules has ONLY access to exactly what exists in the target repository.
 - ALWAYS paste required standards, requirements, or context DIRECTLY into the prompt
 
 [green]1. Create[/green]
-    jules-cli create --repo owner/repo "Fix issue #123"
-    → Fires off agent that creates a PR
+    jules-cli create --repo owner/repo --issue 123
+    → Fetches issue #123, uses title+body+comments as prompt
 
 [bold]Required: --repo[/bold]
     Jules needs to know which repository to work on.
@@ -83,11 +83,18 @@ def get_client() -> JulesAPI:
 
 @app.command()
 def create(
-    prompt: str,
-    repo: str = typer.Option(..., help="GitHub repo in format 'owner/repo'"),
-    branch: str = typer.Option("main", help="Branch to work on"),
+    issue: int = typer.Option(
+        ..., "--issue", "-i", help="GitHub issue number to work on"
+    ),
+    repo: str = typer.Option(
+        ..., "--repo", "-r", help="GitHub repo in format 'owner/repo'"
+    ),
+    branch: str = typer.Option("main", "--branch", "-b", help="Branch to work on"),
 ):
-    """Create a session that creates a PR (plans auto-approved)."""
+    """Create a session from a GitHub issue that creates a PR (plans auto-approved).
+
+    The issue title, body, and all comments are assembled into the prompt.
+    """
     client = get_client()
 
     # Parse owner/repo
@@ -104,19 +111,25 @@ def create(
         )
         raise typer.Exit(1)
 
-    source_id = source[
-        "name"
-    ]  # e.g., "sources/github/dzackgarza/opencode-zotero-plugin"
+    source_id = source["name"]
     default_branch = source["githubRepo"]["defaultBranch"]["displayName"]
 
     # Use provided branch or default
     starting_branch = branch if branch else default_branch
 
+    # Fetch issue and assemble into prompt
+    console.print(f"[cyan]Fetching issue #{issue} from {owner}/{repo_name}...[/cyan]")
+    try:
+        prompt = fetch_issue_markdown(owner, repo_name, issue)
+    except RuntimeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
     # Prepend standardized prompt template if configured
     try:
         template = get_prompt_template(prompt)
         if template:
-            prompt = f"{template}\n\n---\n\nTask: {prompt}"
+            prompt = f"{template}\n\n---\n\nTask:\n\n{prompt}"
     except ConfigError as e:
         console.print(f"[yellow]Warning:[/yellow] {e}")
 
