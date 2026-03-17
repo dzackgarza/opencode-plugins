@@ -93,21 +93,21 @@ def _render_template_from_slug(
     """Render template from ai-prompts slug using templating engine CLI via uvx."""
     import subprocess
 
-    # Build bindings with additional-context for extra files
+    # Build bindings with additional_context for extra files
     bindings = {"data": {"task": task}, "text_files": []}
 
     if context_files:
-        # Read files and add as additional_context in data
-        context_content = []
+        # Read files and format as list of {name, content}
+        context_list = []
         for filepath in context_files:
             try:
                 content = Path(filepath).read_text()
-                filename = Path(filepath).name
-                context_content.append(f"=== {filename} ===\n{content}")
+                name = Path(filepath).name  # basename only
+                context_list.append({"name": name, "content": content})
             except Exception:
                 pass
-        if context_content:
-            bindings["data"]["additional_context"] = "\n\n".join(context_content)
+        if context_list:
+            bindings["data"]["additional_context"] = context_list
 
     request = {
         "template": {"path": f"prompts/{slug}.md"},
