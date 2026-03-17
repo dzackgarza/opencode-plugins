@@ -26,11 +26,14 @@ def help():
     console.print("""
 [bold]Jules CLI - Workflow[/bold]
 
-[bold]IMPORTANT: Prompt Writing[/bold]
-Jules can ONLY see what exists in the target repository.
-- Do NOT reference external files, standards, or documentation that aren't in the repo
-- Include ALL requirements, standards, and context directly in the prompt
-- If you need to reference a standard, paste the relevant sections INTO the prompt
+[bold]IMPORTANT: Prompt Writing - READ THIS FIRST[/bold]
+Jules has ONLY access to exactly what exists in the target repository.
+- It CANNOT read external files, standards docs, or data outside the repo
+- If you reference something not in the repo (e.g., "read README_STANDARDS.md"),
+  that part of the task will be SILENTLY IGNORED
+- Jules will goal-substitute: produce trivial checkbox work to look complete
+  without actually addressing the real requirements
+- ALWAYS paste required standards, requirements, or context DIRECTLY into the prompt
 
 [green]1. Create[/green]
     jules-cli create --repo owner/repo "Fix issue #123"
