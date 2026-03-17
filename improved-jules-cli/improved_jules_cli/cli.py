@@ -26,17 +26,26 @@ def help():
     console.print("""
 [bold]Jules CLI - Workflow[/bold]
 
+[bold]IMPORTANT: Prompt Writing[/bold]
+Jules can ONLY see what exists in the target repository.
+- Do NOT reference external files, standards, or documentation that aren't in the repo
+- Include ALL requirements, standards, and context directly in the prompt
+- If you need to reference a standard, paste the relevant sections INTO the prompt
+
 [green]1. Create[/green]
-    jules-cli create "Fix issue #123"
+    jules-cli create --repo owner/repo "Fix issue #123"
     → Fires off agent that creates a PR
 
+[bold]Required: --repo[/bold]
+    Jules needs to know which repository to work on.
+    Format: owner/repo (e.g., dzackgarza/opencode-zotero-plugin)
+    The repo must be connected to Jules (see Jules dashboard).
+
 [green]2. Wait[/green]
-    jules-cli watch-callback 123 "my-callback.sh"
+    jules-cli watch 123         # Check status once
+    jules-cli watch-callback 123 "callback.sh"
     → Polls until done, runs callback with env vars:
       JULES_SESSION_ID, JULES_STATE, JULES_URL, JULES_PR_URL
-
-    Or manually:
-    jules-cli watch 123         # Check status once
     jules-cli list             # List all sessions
 
 [green]3. Get PR[/green]
@@ -55,9 +64,9 @@ def help():
     jules-cli delete 123
     → Removes session when done
 
-[bold]Setup (once):[/bold]
-    jules-cli config-set-prompt-template ~/jules-prompt.txt
-    → Prepends standardized instructions to every prompt
+[bold]Prompt Template[/bold]
+    A standardized template can be prepended to every prompt.
+    Configure with: jules-cli config-set-prompt-slug <slug>
 """)
 
 
@@ -70,9 +79,35 @@ def get_client() -> JulesAPI:
 
 
 @app.command()
-def create(prompt: str):
+def create(
+    prompt: str,
+    repo: str = typer.Option(..., help="GitHub repo in format 'owner/repo'"),
+    branch: str = typer.Option("main", help="Branch to work on"),
+):
     """Create a session that creates a PR (plans auto-approved)."""
     client = get_client()
+
+    # Parse owner/repo
+    if "/" not in repo:
+        console.print("[red]Error:[/red] Repo must be in format 'owner/repo'")
+        raise typer.Exit(1)
+    owner, repo_name = repo.split("/", 1)
+
+    # Look up the source
+    source = client.find_source_by_repo(owner, repo_name)
+    if not source:
+        console.print(
+            f"[red]Error:[/red] Repo '{repo}' not connected to Jules. Run 'jules remote list --repo' to see connected repos."
+        )
+        raise typer.Exit(1)
+
+    source_id = source[
+        "name"
+    ]  # e.g., "sources/github/dzackgarza/opencode-zotero-plugin"
+    default_branch = source["githubRepo"]["defaultBranch"]["displayName"]
+
+    # Use provided branch or default
+    starting_branch = branch if branch else default_branch
 
     # Prepend standardized prompt template if configured
     try:
@@ -82,8 +117,15 @@ def create(prompt: str):
     except ConfigError as e:
         console.print(f"[yellow]Warning:[/yellow] {e}")
 
+    # Build source context for the repo (API format)
+    source_context = {
+        "source": source_id,
+        "githubRepoContext": {"startingBranch": starting_branch},
+    }
+
     session = client.create_session(
         prompt=prompt,
+        source_context=source_context,
         require_plan_approval=False,
         automation_mode="AUTO_CREATE_PR",
     )
