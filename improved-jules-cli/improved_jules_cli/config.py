@@ -104,7 +104,7 @@ def _render_template_from_slug(slug: str, task: str) -> str:
         )
         if result.returncode == 0:
             response = json.loads(result.stdout)
-            return response.get("rendered", {}).get("document", "")
+            return response.get("rendered", {}).get("body", "")
     except Exception:
         pass
 
