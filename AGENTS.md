@@ -15,7 +15,7 @@ When working in this repository, reference these skills:
 
 ## Quick Reference
 
-- **Test sandbox**: `just test-sandbox-up` / `just test-sandbox-down`. Creates an isolated opencode server on `http://127.0.0.1:4097` with its own tmpdir for HOME/XDG dirs. Tests set `OPENCODE_CONFIG` to their plugin's config.
+- **Test sandbox**: `just test-sandbox-up` / `just test-sandbox-down`. Creates an isolated opencode server on `http://127.0.0.1:4097` with its own tmp HOME/XDG dirs plus a sandbox-local project dir, and writes `.test-sandbox-env.sh` for package repos to source.
 - **Audit checklist**: See `REPO_AUDIT.md` (symlink to skill) before pushing.
 - **Structure**: Each subdirectory is an independent package repo.
 

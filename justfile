@@ -62,22 +62,34 @@ update-usage:
 # ---------------------------------------------------------------------------
 #
 # Two recipes: test-sandbox-up and test-sandbox-down.
-# test-sandbox-up creates an isolated opencode instance that cannot see host
-# configs, starts `opencode serve` on the canonical address, health-checks it,
-# and writes PID/path metadata to .test-server.pid and .test-sandbox-path.
-# test-sandbox-down tears it all down.
+# test-sandbox-up creates an entirely new tmp sandbox with its own HOME/XDG
+# directories plus a dedicated project directory for package-specific test data.
+# It starts a separate `opencode serve` instance on the canonical fixed test
+# address, health-checks it, and writes PID/path/env metadata at the repo root.
+#
+# Config note: OpenCode resolves config by precedence; refer to the OpenCode
+# docs when deciding whether a test needs only the copied global skeleton config
+# or a package/project-specific override. If a package needs custom agents,
+# plugin installation by file path/git, or stricter test-only permissions, pass
+# explicit override files to this recipe so they are copied into the sandbox
+# before the server starts.
 #
 # Usage:
 #   just test-sandbox-up
-#   OPENCODE_BASE_URL=http://127.0.0.1:4097 bun test   # (tests set OPENCODE_CONFIG per-plugin)
+#   TEST_SANDBOX_CONFIG_JSON=/abs/path/to/opencode.json just test-sandbox-up
+#   source .test-sandbox-env.sh
+#   OPENCODE_BASE_URL=http://127.0.0.1:4097 bun test
 #   just test-sandbox-down
 
 test_port := "4097"
 test_host := "127.0.0.1"
 test_base_url := "http://" + test_host + ":" + test_port
+test_sandbox_env := justfile_directory() + "/.test-sandbox-env.sh"
 
-# Stand up an isolated opencode sandbox and serve on 127.0.0.1:4097.
-# Copies the global opencode config into the sandbox. Health-checks before returning.
+# Stand up an isolated OpenCode test sandbox on 127.0.0.1:4097.
+# This scaffolds a new tmp HOME/XDG tree plus a sandbox-local project dir and
+# writes `.test-sandbox-env.sh` so package repos can source the exact runtime.
+# Optional override files are copied into the sandbox before startup.
 [group('test')]
 test-sandbox-up:
 	#!/usr/bin/env bash
@@ -92,7 +104,7 @@ test-sandbox-up:
 	  fi
 	  # Stale metadata — clean up
 	  rm -rf "$sandbox"
-	  rm -f "{{justfile_directory()}}/.test-sandbox-path" "{{justfile_directory()}}/.test-server.pid"
+	  rm -f "{{justfile_directory()}}/.test-sandbox-path" "{{justfile_directory()}}/.test-server.pid" "{{test_sandbox_env}}"
 	fi
 
 	# Create isolated tmpdir
@@ -102,27 +114,52 @@ test-sandbox-up:
 	state_home="$sandbox/state"
 	data_home="$sandbox/data"
 	fake_home="$sandbox/home"
-	mkdir -p "$config_home/opencode" "$cache_home" "$state_home" "$data_home" "$fake_home"
+	project_dir="$sandbox/project"
+	mkdir -p "$config_home/opencode" "$cache_home" "$state_home" "$data_home" "$fake_home" "$project_dir"
 
-	# Copy global opencode config into sandbox
+	# Canonical test defaults. Override here only if the root workspace standard changes.
+	export SERVER_URL="{{test_host}}"
+	export SERVER_PORT="{{test_port}}"
+	export OPENCODE_BASE_URL="{{test_base_url}}"
+	export OPENCODE_DISABLE_CLAUDE_CODE="${OPENCODE_DISABLE_CLAUDE_CODE:-1}"
+	export OPENCODE_ENABLE_EXA="${OPENCODE_ENABLE_EXA:-1}"
+	export OPENCODE_EXPERIMENTAL_LSP_TY="${OPENCODE_EXPERIMENTAL_LSP_TY:-1}"
+	export OPENCODE_EXPERIMENTAL_LSP_TOOL="${OPENCODE_EXPERIMENTAL_LSP_TOOL:-true}"
+
+	# Copy the global skeleton config first.
 	global_config="$HOME/.config/opencode/opencode.json"
 	if [[ -f "$global_config" ]]; then
 	  cp "$global_config" "$config_home/opencode/opencode.json"
 	fi
+	if [[ -n "${TEST_SANDBOX_CONFIG_JSON:-}" ]]; then
+	  cp "${TEST_SANDBOX_CONFIG_JSON}" "$config_home/opencode/opencode.json"
+	fi
+	if [[ -n "${TEST_SANDBOX_CONFIG_PACKAGE_JSON:-}" ]]; then
+	  cp "${TEST_SANDBOX_CONFIG_PACKAGE_JSON}" "$config_home/opencode/package.json"
+	fi
+	if [[ -n "${TEST_SANDBOX_CONFIG_GITIGNORE:-}" ]]; then
+	  cp "${TEST_SANDBOX_CONFIG_GITIGNORE}" "$config_home/opencode/.gitignore"
+	fi
+
+	cat > "{{test_sandbox_env}}" <<-EOF
+	export HOME="$fake_home"
+	export XDG_CONFIG_HOME="$config_home"
+	export XDG_CACHE_HOME="$cache_home"
+	export XDG_STATE_HOME="$state_home"
+	export XDG_DATA_HOME="$data_home"
+	export OPENCODE_BASE_URL="{{test_base_url}}"
+	export OPENCODE_CONFIG="$config_home/opencode/opencode.json"
+	export OPENCODE_TEST_PROJECT_DIR="$project_dir"
+	export SERVER_URL="{{test_host}}"
+	export SERVER_PORT="{{test_port}}"
+	export OPENCODE_DISABLE_CLAUDE_CODE="$OPENCODE_DISABLE_CLAUDE_CODE"
+	export OPENCODE_ENABLE_EXA="$OPENCODE_ENABLE_EXA"
+	export OPENCODE_EXPERIMENTAL_LSP_TY="$OPENCODE_EXPERIMENTAL_LSP_TY"
+	export OPENCODE_EXPERIMENTAL_LSP_TOOL="$OPENCODE_EXPERIMENTAL_LSP_TOOL"
+	EOF
 
 	# Start server with fully isolated env
-	HOME="$fake_home" \
-	XDG_CONFIG_HOME="$config_home" \
-	XDG_CACHE_HOME="$cache_home" \
-	XDG_STATE_HOME="$state_home" \
-	XDG_DATA_HOME="$data_home" \
-	OPENCODE_BASE_URL="{{test_base_url}}" \
-	opencode serve \
-	  --hostname "{{test_host}}" \
-	  --port "{{test_port}}" \
-	  --print-logs \
-	  --log-level INFO \
-	  > "$sandbox/server.log" 2>&1 &
+	HOME="$fake_home" XDG_CONFIG_HOME="$config_home" XDG_CACHE_HOME="$cache_home" XDG_STATE_HOME="$state_home" XDG_DATA_HOME="$data_home" OPENCODE_BASE_URL="{{test_base_url}}" OPENCODE_DISABLE_CLAUDE_CODE="$OPENCODE_DISABLE_CLAUDE_CODE" OPENCODE_ENABLE_EXA="$OPENCODE_ENABLE_EXA" OPENCODE_EXPERIMENTAL_LSP_TY="$OPENCODE_EXPERIMENTAL_LSP_TY" OPENCODE_EXPERIMENTAL_LSP_TOOL="$OPENCODE_EXPERIMENTAL_LSP_TOOL" opencode serve --hostname "{{test_host}}" --port "{{test_port}}" --print-logs --log-level INFO > "$sandbox/server.log" 2>&1 &
 	server_pid=$!
 
 	# Record metadata
@@ -137,7 +174,7 @@ test-sandbox-up:
 	    echo "Server exited early (pid $server_pid). Logs:" >&2
 	    tail -30 "$sandbox/server.log" >&2
 	    rm -rf "$sandbox"
-	    rm -f "{{justfile_directory()}}/.test-sandbox-path" "{{justfile_directory()}}/.test-server.pid"
+	    rm -f "{{justfile_directory()}}/.test-sandbox-path" "{{justfile_directory()}}/.test-server.pid" "{{test_sandbox_env}}"
 	    exit 1
 	  fi
 	  if curl -sf "{{test_base_url}}/global/health" >/dev/null 2>&1; then
@@ -151,7 +188,7 @@ test-sandbox-up:
 	tail -30 "$sandbox/server.log" >&2
 	kill "$server_pid" 2>/dev/null || true
 	rm -rf "$sandbox"
-	rm -f "{{justfile_directory()}}/.test-sandbox-path" "{{justfile_directory()}}/.test-server.pid"
+	rm -f "{{justfile_directory()}}/.test-sandbox-path" "{{justfile_directory()}}/.test-server.pid" "{{test_sandbox_env}}"
 	exit 1
 
 # Tear down the test sandbox: kill server, remove tmpdir.
@@ -180,7 +217,7 @@ test-sandbox-down:
 	fi
 
 	rm -rf "$sandbox"
-	rm -f "$sandbox_file" "{{justfile_directory()}}/.test-server.pid"
+	rm -f "$sandbox_file" "{{justfile_directory()}}/.test-server.pid" "{{test_sandbox_env}}"
 	echo "Sandbox torn down."
 
 # ---------------------------------------------------------------------------

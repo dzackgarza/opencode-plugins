@@ -22,10 +22,10 @@ just test-sandbox-up     # creates tmpdir, starts opencode serve on 127.0.0.1:40
 just test-sandbox-down   # kills server, removes tmpdir
 ```
 
-`test-sandbox-up` creates a tmpdir with isolated `HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_STATE_HOME`, and `XDG_DATA_HOME`. It copies the global opencode config (`~/.config/opencode/opencode.json`) into the sandbox so the server has provider credentials and baseline settings, then starts `opencode serve` and waits for `/global/health` to return before completing.
+`test-sandbox-up` creates a tmpdir with isolated `HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_STATE_HOME`, `XDG_DATA_HOME`, and a sandbox-local project directory. It writes the exact runtime exports to `.test-sandbox-env.sh`, copies the global opencode config (`~/.config/opencode/opencode.json`) into the sandbox as the default skeleton, then starts a dedicated `opencode serve` instance and waits for `/global/health` to return before completing.
 
 The canonical test address is always `http://127.0.0.1:4097`.
 
-**Per-plugin config:** Tests set `OPENCODE_CONFIG` to point at their plugin's `.config/opencode.json`, which extends the global config with plugin-specific agents, permissions, and plugin references. This follows opencode's config precedence (global → custom path → project).
+**Package-specific overrides:** If a package needs custom agents, plugin installation by file path or git, or stricter default-agent permissions, export `TEST_SANDBOX_CONFIG_JSON` (and the companion `TEST_SANDBOX_CONFIG_PACKAGE_JSON` / `TEST_SANDBOX_CONFIG_GITIGNORE` values when needed) before `test-sandbox-up` so the sandbox is populated before the server starts. Refer to the OpenCode docs for config resolution order when deciding whether an override belongs in the copied global config or in the sandbox-local project directory.
 
 Refer to individual package READMEs for plugin-specific test details. For a compliance rubric, see the `opencode-plugin-development` skill.
