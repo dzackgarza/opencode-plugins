@@ -1,12 +1,8 @@
 """Improved Jules CLI - Configuration."""
 
-import json
 import os
 from pathlib import Path
 from typing import Optional
-
-CONFIG_DIR = Path.home() / ".config" / "improved-jules-cli"
-CONFIG_FILE = CONFIG_DIR / "config.json"
 
 # Default ai-prompts directory
 AI_PROMPTS_DIR = os.environ.get(
@@ -18,61 +14,35 @@ class ConfigError(Exception):
     pass
 
 
-def ensure_config_dir():
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def load_config() -> dict:
-    if not CONFIG_FILE.exists():
-        return {}
-    try:
-        return json.loads(CONFIG_FILE.read_text())
-    except json.JSONDecodeError:
-        return {}
-
-
-def save_config(config: dict):
-    ensure_config_dir()
-    CONFIG_FILE.write_text(json.dumps(config, indent=2))
-
-
 def get_api_key() -> str:
+    """Get API key from environment. Fails if not set."""
     env_key = os.environ.get("JULES_API_KEY")
     if env_key:
         return env_key
 
-    config = load_config()
-    if config.get("api_key"):
-        return config["api_key"]
-
-    raise ConfigError("Set JULES_API_KEY or run: jules-cli config-set-api-key <key>")
-
-
-def set_api_key(key: str):
-    config = load_config()
-    config["api_key"] = key
-    save_config(config)
+    raise ConfigError("JULES_API_KEY environment variable is required")
 
 
 def get_prompt_template(
     task: str,
     context_files: Optional[list[str]] = None,
+    prompt_slug: Optional[str] = None,
+    template_path: Optional[str] = None,
 ) -> Optional[str]:
     """Get prompt template and render with task binding via templating engine.
 
     Args:
         task: The task/issue to render in the template
         context_files: List of file paths to include as text_files bindings
+        prompt_slug: ai-prompts slug (e.g., "sub-agents/jules-pr-body-contract")
+        template_path: Path to template file
     """
-    config = load_config()
 
     # Check for ai-prompts slug
-    prompt_slug = config.get("prompt_slug")
     if prompt_slug:
         return _render_template_from_slug(prompt_slug, task, context_files)
 
     # Fallback to file path
-    template_path = config.get("prompt_template_path")
     if not template_path:
         return None
 
@@ -91,6 +61,7 @@ def _render_template_from_slug(
     context_files: Optional[list[str]] = None,
 ) -> str:
     """Render template from ai-prompts slug using templating engine CLI via uvx."""
+    import json
     import subprocess
 
     # Build bindings with additional_context for extra files
@@ -138,16 +109,3 @@ def _render_template_from_slug(
 
     # Fallback: just return task
     return task
-
-
-def set_prompt_template_path(path: str):
-    config = load_config()
-    config["prompt_template_path"] = path
-    save_config(config)
-
-
-def set_prompt_slug(slug: str):
-    """Set ai-prompts slug for prompt template."""
-    config = load_config()
-    config["prompt_slug"] = slug
-    save_config(config)

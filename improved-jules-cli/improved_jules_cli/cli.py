@@ -1,5 +1,12 @@
 """Improved Jules CLI - Streamlined workflow."""
 
+import sys
+
+# Capture piped stdin content before typer imports
+_stdin_content = ""
+if not sys.stdin.buffer.isatty():
+    _stdin_content = sys.stdin.buffer.read().decode("utf-8")
+
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -7,11 +14,8 @@ from rich.table import Table
 from improved_jules_cli.api import JulesAPI
 from improved_jules_cli.config import (
     get_api_key,
-    set_api_key,
     ConfigError,
     get_prompt_template,
-    set_prompt_slug,
-    load_config,
 )
 from improved_jules_cli.github import fetch_issue_markdown, parse_issue_url
 
@@ -70,7 +74,7 @@ Jules has ONLY access to exactly what exists in the target repository.
 
 [bold]Prompt Template[/bold]
     A standardized template can be prepended to every prompt.
-    Configure with: jules-cli config-set-prompt-slug <slug>
+    Use --prompt-slug to specify (e.g., --prompt-slug sub-agents/jules-pr-body-contract)
 """)
 
 
@@ -93,6 +97,12 @@ def create(
         "--context",
         "-c",
         help="Additional files to include as context (will be inlined into prompt)",
+    ),
+    prompt_slug: str = typer.Option(
+        None,
+        "--prompt-slug",
+        "-s",
+        help="ai-prompts slug for prompt template (e.g., sub-agents/jules-pr-body-contract)",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -133,7 +143,9 @@ def create(
         # Build prompt
         try:
             template = get_prompt_template(
-                prompt, context_files=context if context else None
+                prompt,
+                context_files=context if context else None,
+                prompt_slug=prompt_slug,
             )
             if template:
                 prompt = f"{template}\n\n---\n\nTask:\n\n{prompt}"
@@ -173,7 +185,9 @@ def create(
     # Prepend standardized prompt template if configured
     try:
         template = get_prompt_template(
-            prompt, context_files=context if context else None
+            prompt,
+            context_files=context if context else None,
+            prompt_slug=prompt_slug,
         )
         if template:
             prompt = f"{template}\n\n---\n\nTask:\n\n{prompt}"
@@ -245,8 +259,18 @@ def pr(session_id: str):
 
 
 @app.command()
-def feedback(session_id: str, message: str):
-    """Send feedback to session for more work."""
+def feedback(
+    session_id: str = typer.Argument(..., help="Session ID"),
+    message: str = typer.Argument(default="", help="Message text"),
+):
+    """Send feedback to session for more work. Omit message to use piped input."""
+    # Use pre-read stdin content if no message provided
+    if not message and _stdin_content:
+        message = _stdin_content.strip()
+
+    if not message:
+        raise typer.BadParameter("Message required")
+
     client = get_client()
     client.send_message(session_id, message)
     console.print(f"[green]Feedback sent to {session_id}[/green]")
@@ -301,36 +325,6 @@ def get(session_id: str):
     console.print(f"[cyan]ID:[/cyan] {session.get('id')}")
     console.print(f"[cyan]State:[/cyan] {session.get('state')}")
     console.print(f"[cyan]Prompt:[/cyan] {session.get('prompt', '')[:500]}...")
-
-
-# Config commands (hidden - one-time setup only)
-@app.command(hidden=True)
-def config_show():
-    """Show configuration."""
-    try:
-        get_api_key()
-    except ConfigError:
-        console.print("[red]API key not set[/red]")
-
-    cfg = load_config()
-    slug = cfg.get("prompt_slug", "(not set)")
-    path = cfg.get("prompt_template_path", "(not set)")
-    console.print(f"Prompt slug: {slug}")
-    console.print(f"Prompt file: {path}")
-
-
-@app.command(hidden=True)
-def config_set_prompt_slug(slug: str):
-    """Set ai-prompts slug for prompt template."""
-    set_prompt_slug(slug)
-    console.print(f"[green]Prompt slug:[/green] {slug}")
-
-
-@app.command(hidden=True)
-def config_set_api_key(key: str):
-    """Set API key."""
-    set_api_key(key)
-    console.print("[green]API key saved[/green]")
 
 
 if __name__ == "__main__":

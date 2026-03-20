@@ -53,5 +53,6 @@
 # Debug databases and test artifacts at root level
 .debug_db/
 .test_*
+.test-sandbox-path
 .tmp_db*
 *.debug.json

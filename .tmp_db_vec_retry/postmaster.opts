@@ -1,1 +1,0 @@
-/home/dzack/.cache/uv/archive-v0/B8_uqmFlBJtvpybf3PsQ3/lib/python3.12/site-packages/pgserver/pginstall/bin/postgres "-D" "/home/dzack/opencode-plugins/.tmp_db_vec_retry" "-h" "" "-k" "/home/dzack/opencode-plugins/.tmp_db_vec_retry"

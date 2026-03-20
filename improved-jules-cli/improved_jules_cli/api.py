@@ -37,12 +37,30 @@ class JulesAPI:
         return self._request("GET", "/sessions", params=params)
 
     # Sources
-    def list_sources(self) -> dict:
+    def list_sources(
+        self, page_size: int = 100, page_token: Optional[str] = None
+    ) -> dict:
         """List available sources."""
-        return self._request("GET", "/sources")
+        params = {"pageSize": page_size}
+        if page_token:
+            params["pageToken"] = page_token
+        return self._request("GET", "/sources", params=params)
 
     def get_session(self, session_id: str) -> dict:
         return self._request("GET", f"/sessions/{session_id}")
+
+    def find_source_by_repo(self, owner: str, repo: str) -> Optional[dict]:
+        """Find a source by owner/repo name."""
+        page_token = None
+        while True:
+            result = self.list_sources(page_token=page_token)
+            for source in result.get("sources", []):
+                gh = source.get("githubRepo", {})
+                if gh.get("owner") == owner and gh.get("repo") == repo:
+                    return source
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                return None
 
     def create_session(
         self,

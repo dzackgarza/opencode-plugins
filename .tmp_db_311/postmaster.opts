@@ -1,1 +1,0 @@
-/home/dzack/.cache/uv/archive-v0/F9MfItFkb0EUvOXlh6jjP/lib/python3.11/site-packages/pgserver/pginstall/bin/postgres "-D" "/home/dzack/opencode-plugins/.tmp_db_311" "-h" "" "-k" "/home/dzack/opencode-plugins/.tmp_db_311"

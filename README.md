@@ -13,39 +13,19 @@ Collection of standalone OpenCode plugin packages and shared support code.
 - **[opencode-plugin-mcp-shim](./opencode-plugin-mcp-shim/README.md)**: Shared TypeScript executor for MCP wrappers.
 - **[opencode-zotero-plugin](./opencode-zotero-plugin/README.md)**: Zotero toolkit and OpenCode adapter surfaces.
 
-## Worktrees
+## Testing
 
-Active multi-repo migration worktrees live under one hidden home-level root:
+Integration tests run against an isolated opencode server that cannot see host configs. The top-level justfile manages the sandbox lifecycle:
 
-`/home/dzack/.worktrees/opencode-plugins`
+```bash
+just test-sandbox-up     # creates tmpdir, starts opencode serve on 127.0.0.1:4097, health-checks
+just test-sandbox-down   # kills server, removes tmpdir
+```
 
-Current migration worktrees:
+`test-sandbox-up` creates a tmpdir with isolated `HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_STATE_HOME`, and `XDG_DATA_HOME`. It copies the global opencode config (`~/.config/opencode/opencode.json`) into the sandbox so the server has provider credentials and baseline settings, then starts `opencode serve` and waits for `/global/health` to return before completing.
 
-- `opencode-plugin-improved-webtools` → `/home/dzack/.worktrees/opencode-plugins/opencode-plugin-improved-webtools/migration-cli-first-architecture`
-- `opencode-plugin-improved-todowrite` → `/home/dzack/.worktrees/opencode-plugins/opencode-plugin-improved-todowrite/migration-cli-first-architecture`
-- `opencode-plugin-improved-task` → `/home/dzack/.worktrees/opencode-plugins/opencode-plugin-improved-task/migration-cli-first-architecture`
-- `opencode-plugin-prompt-transformer` → `/home/dzack/.worktrees/opencode-plugins/opencode-plugin-prompt-transformer/migration-cli-first-architecture`
-- `opencode-plugin-reminder-injection` → `/home/dzack/.worktrees/opencode-plugins/opencode-plugin-reminder-injection/migration-cli-first-architecture`
-- `opencode-postgres-memory-plugin` → `/home/dzack/.worktrees/opencode-plugins/opencode-postgres-memory-plugin/migration-cli-first-architecture`
-- `opencode-time-travel-plugin` → `/home/dzack/.worktrees/opencode-plugins/opencode-time-travel-plugin/migration-cli-first-architecture`
-- `opencode-zotero-plugin` → `/home/dzack/.worktrees/opencode-plugins/opencode-zotero-plugin/migration-cli-first-architecture`
+The canonical test address is always `http://127.0.0.1:4097`.
 
-Clean-clone fallback roots for damaged repos:
+**Per-plugin config:** Tests set `OPENCODE_CONFIG` to point at their plugin's `.config/opencode.json`, which extends the global config with plugin-specific agents, permissions, and plugin references. This follows opencode's config precedence (global → custom path → project).
 
-- `opencode-postgres-memory-plugin` → `/home/dzack/.worktrees/opencode-plugins-clean/opencode-postgres-memory-plugin/repo`
-
-Current Codex migration sessions:
-
-- `opencode-zotero-plugin` PR remediation → session `27118`
-- clean `opencode-postgres-memory-plugin` re-land → session `31185`
-- `opencode-time-travel-plugin` continuation → session `92207`
-- earlier session ids above are stale and should not be resumed
-
-If orchestration context is lost, poll these session ids directly before starting a replacement run.
-
-Legacy top-level worktrees still present in this repo:
-
-- `/home/dzack/opencode-plugins/.worktrees/improved-webtools-live-reddit`
-- `/home/dzack/opencode-plugins/.worktrees/improved-webtools-live-youtube`
-
-Refer to individual package READMEs for installation, dependencies, and tool schemas.
+Refer to individual package READMEs for plugin-specific test details. For a compliance rubric, see the `opencode-plugin-development` skill.
