@@ -55,4 +55,4 @@
 .test_*
 .test-sandbox-path
 .tmp_db*
-*.debug.json
+*.debug.json.testrc
