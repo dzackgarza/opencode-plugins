@@ -162,14 +162,16 @@ Last updated: 2026-03-19
 
 - [x] Keep plugin repos focused on wrapper and integration tests.
 - [x] Server management moved out of test code into justfile shell scripts for all plugins:
-  - [x] `opencode-plugin-improved-todowrite` — server lifecycle in justfile
-  - [x] `opencode-plugin-prompt-transformer` — server lifecycle in justfile
-  - [x] `opencode-memory-plugin` — server lifecycle in justfile
-  - [x] `opencode-zotero-plugin` — justfile standardized (no server needed yet)
-  - [x] `opencode-plugin-improved-webtools` — justfile added (uses opencode run, no server)
-  - [x] `opencode-plugin-reminder-injection` — no server changes needed (no integration tests)
+  - [x] `opencode-plugin-improved-todowrite` — delegates to root test-sandbox-up/down
+  - [x] `opencode-plugin-prompt-transformer` — delegates to root test-sandbox-up/down
+  - [x] `opencode-memory-plugin` — delegates to root test-sandbox-up/down; exports OPENCODE_MEMORY_ROOT
+  - [x] `opencode-zotero-plugin` — delegates to root test-sandbox-up/down
+  - [x] `opencode-plugin-improved-webtools` — delegates to root test-sandbox-up/down; test rewritten to use ocm pattern
+  - [x] `opencode-plugin-reminder-injection` — delegates to root test-sandbox-up/down; fixed destructive rm -rf of host cache
 - [x] Integration tests read OPENCODE_BASE_URL from env (set by justfile), no inline spawning.
-- [x] All active plugin test configs extracted to `tests/integration/test-opencode.json`.
+- [x] All active plugin test configs at `tests/integration/opencode.json` (static, committed, complete configs).
+- [x] `opencode-plugin-improved-webtools` test rewritten: strips beforeAll/afterAll, uses ocm begin-session+wait+transcript, removes nonexistent debug-mode tools.
+- [x] `opencode-plugin-improved-task` audited: uses ocm for transcript reading, native client.session.* for lifecycle. No dead binaries.
 - [~] `just test` for prompt-transformer and todowrite blocked on PR #19 merge in opencode-manager.
 - [ ] Restore or move tests so managers own core-logic tests.
 - [ ] Add `just` targets for managers.
@@ -190,9 +192,13 @@ Last updated: 2026-03-19
 ## Current Findings
 
 - All plugin wrapper code now points at remote git+https URLs (rewired 2026-03-21).
-- Server management migrated out of all plugin test files into justfile shell scripts (2026-03-21).
-- Both `prompt-transformer` and `todowrite` integration tests rewritten with correct ocm patterns.
-- PR #19 on dzackgarza/opencode-manager is the only blocker for live test validation.
+- All 6 plugins migrated to root sandbox pattern (test-sandbox-up/down) — 2026-03-21.
+  - All plugins ship static `tests/integration/opencode.json` (absolute plugin URL + restricted agent config).
+  - Server lifecycle is entirely in root justfile; test files contain only assertions.
+- `opencode-plugin-improved-webtools` test fully rewritten to use ocm pattern; debug-mode tests removed.
+- `opencode-plugin-reminder-injection` test recipe fixed (was running rm -rf on host cache).
+- `opencode-plugin-improved-task` audited and confirmed correct (no dead binaries, uses ocm + native client API).
+- PR #19 on dzackgarza/opencode-manager is the only blocker for live test validation of prompt-transformer and todowrite.
 - `memory-manager` has been pushed to `origin/main` and no longer blocks remote-manager existence; it still needs explicit remote `uvx` validation and any remaining local follow-up sync.
 - `memory-manager` remote `uvx --help` validation now succeeds.
 - `zotero-manager`, `webtools-manager`, `todowrite-manager`, and `reminder-manager` now report upstream tracking on `origin/main`.
