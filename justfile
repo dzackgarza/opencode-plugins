@@ -142,12 +142,12 @@ test-sandbox-up config envrc:
 	cp "{{envrc}}" "$OPENCODE_TEST_PROJECT_DIR/.envrc"
 	XDG_DATA_HOME="$XDG_DATA_HOME" direnv allow "$OPENCODE_TEST_PROJECT_DIR/.envrc"
 
-	# Copy global opencode config and auth.json from real HOME into sandbox.
-	# These provide provider auth without leaking other shell vars.
-	real_global_config="$REAL_HOME/.config/opencode/opencode.json"
-	if [[ -f "$real_global_config" ]]; then
-	  cp "$real_global_config" "$XDG_CONFIG_HOME/opencode/opencode.json"
-	fi
+	# Sandbox global config: use the repo-managed minimal config.
+	# NEVER copy the real global config — it contains plugins, MCP servers, and
+	# other user tooling that must not be visible to the isolated test agent.
+	cp "{{justfile_directory()}}/config/sandbox-global.json" "$XDG_CONFIG_HOME/opencode/opencode.json"
+
+	# Copy auth.json only — provider credentials needed for model calls.
 	real_auth_json="$REAL_XDG_DATA_HOME/opencode/auth.json"
 	if [[ -f "$real_auth_json" ]]; then
 	  cp "$real_auth_json" "$XDG_DATA_HOME/opencode/auth.json"
