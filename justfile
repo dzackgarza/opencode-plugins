@@ -132,13 +132,15 @@ test-sandbox-up config envrc:
 	# .testrc is the single source of truth for test env vars.
 	# Copy it into sandbox HOME as .envrc so direnv exec loads it for the server.
 	cp "{{justfile_directory()}}/.testrc" "$HOME/.envrc"
-	direnv allow "$HOME/.envrc"
+	# Store allow hashes in sandbox XDG_DATA_HOME so direnv exec finds them
+	# when running under env -i (which has no access to the real user's allow db).
+	XDG_DATA_HOME="$XDG_DATA_HOME" direnv allow "$HOME/.envrc"
 
 	# Copy plugin .envrc into project dir. It must use source_up so direnv's
 	# traversal finds $HOME/.envrc (= .testrc copy) since OPENCODE_TEST_PROJECT_DIR
 	# lives inside the sandbox HOME.
 	cp "{{envrc}}" "$OPENCODE_TEST_PROJECT_DIR/.envrc"
-	direnv allow "$OPENCODE_TEST_PROJECT_DIR/.envrc"
+	XDG_DATA_HOME="$XDG_DATA_HOME" direnv allow "$OPENCODE_TEST_PROJECT_DIR/.envrc"
 
 	# Copy global opencode config and auth.json from real HOME into sandbox.
 	# These provide provider auth without leaking other shell vars.
@@ -161,6 +163,7 @@ test-sandbox-up config envrc:
 	env -i \
 	  HOME="$HOME" \
 	  PATH="$PATH" \
+	  XDG_DATA_HOME="$XDG_DATA_HOME" \
 	  direnv exec "$OPENCODE_TEST_PROJECT_DIR" \
 	  bash -c "opencode serve --hostname '{{test_host}}' --port '{{test_port}}' --print-logs --log-level INFO" \
 	  > "$OPENCODE_TEST_SANDBOX/server.log" 2>&1 &
