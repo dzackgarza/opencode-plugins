@@ -116,6 +116,9 @@ test-sandbox-up config envrc:
 	  fi
 	fi
 	rm -rf "$OPENCODE_TEST_SANDBOX"
+	rm -f "{{justfile_directory()}}/.test-sandbox-path" \
+	      "{{justfile_directory()}}/.test-server.pid" \
+	      "{{justfile_directory()}}/.test-sandbox-env.sh"
 
 	# Create dir structure. All paths come from .testrc.
 	mkdir -p \
@@ -213,6 +216,10 @@ test-sandbox-down:
 	fi
 
 	rm -rf "$OPENCODE_TEST_SANDBOX"
+	# Clean up any legacy artifacts from previous sandbox architecture.
+	rm -f "{{justfile_directory()}}/.test-sandbox-path" \
+	      "{{justfile_directory()}}/.test-server.pid" \
+	      "{{justfile_directory()}}/.test-sandbox-env.sh"
 	echo "Sandbox torn down."
 
 # ---------------------------------------------------------------------------
