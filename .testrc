@@ -28,4 +28,8 @@ export OPENCODE_EXPERIMENTAL_LSP_TOOL=true
 # Shared test vars — agent name used by all integration tests
 export OPENCODE_TEST_AGENT_NAME="plugin-proof"
 
+# SSL certificate bundle — required for Python httpx/requests inside env -i sandbox.
+export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+
 # Plugin-specific test vars — defined in each plugin's .envrc, not here.

@@ -209,9 +209,7 @@ test-sandbox-up config envrc:
 	  timeout 60 \
 	    env XDG_DATA_HOME="$XDG_DATA_HOME" \
 	    direnv exec "$OPENCODE_TEST_PROJECT_DIR" \
-	    uvx --from git+https://github.com/dzackgarza/opencode-manager.git \
-	    ocm one-shot "Reply with EXACTLY this token and nothing else: $CANARY_PHRASE" \
-	    --agent plugin-proof \
+	    bash -c "cd '$OPENCODE_TEST_PROJECT_DIR' && uvx --from git+https://github.com/dzackgarza/opencode-manager.git ocm one-shot 'Reply with EXACTLY this token and nothing else: $CANARY_PHRASE' --agent plugin-proof" \
 	    2>"$OPENCODE_TEST_SANDBOX/canary.log"
 	) || true
 
