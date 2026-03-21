@@ -58,15 +58,11 @@ Local wrapper routing status:
 
 ## Known Local Blockers
 
-These are the main remaining local issues before publication/remote validation:
-
-- `plugins/opencode-plugin-prompt-transformer/tests/integration/prompt-router.test.ts`
-  - still fails against the current OpenCode manager workflow
-  - previous assumptions about `opx-session` are stale
-  - user noted that upstream renamed `opx` usage toward `ocm` and added functionality
-- `plugins/opencode-plugin-improved-todowrite/tests/integration/todowrite-plugin.test.ts`
-  - still fails in live proof mode with `FAIL:PROOF_NOT_POSSIBLE`
-  - likely a tool visibility / session behavior issue rather than CLI-core logic
+- **[BLOCKED on PR #19 merge in dzackgarza/opencode-manager]**
+  - Both `prompt-transformer` and `todowrite` integration tests use `ocm begin-session`.
+  - Local `clis/opencode-manager` has the fix (`submit_prompt_no_wait`).
+  - Published GitHub main still uses blocking `submit_prompt` → tests fail live.
+  - PR #19 needs merge before either test can be validated green.
 - `plugins/opencode-plugin-improved-task`
   - still needs a clean local audit/rewrite around the real `ocm` manager surface
   - do not create a new standalone CLI for it
@@ -94,50 +90,33 @@ Probably not needed yet:
 
 ## Immediate Next Actions
 
-Do these next, in order:
+### 1. Merge PR #19 in dzackgarza/opencode-manager
 
-### 1. Update the manager-integration assumptions from `opx` to `ocm`
+- The fix (`submit_prompt_no_wait`) is already in the local repo at `clis/opencode-manager`.
+- Merging PR #19 unblocks live `just test` validation for both prompt-transformer and todowrite.
 
-- Audit the current `clis/opencode-manager` public workflow surface.
-- Determine whether `ocm` is a renamed binary, an alias, or a new command surface.
-- Update the durable checklist to reflect the current manager CLI name and workflow.
+### 2. Run `just test` for both fixed plugins (after PR #19 merge)
 
-### 2. Fix the two blocked plugin integration proofs
-
-- `plugins/opencode-plugin-prompt-transformer/tests/integration/prompt-router.test.ts`
-  - rewrite around the current manager workflow instead of the removed `opx-session` assumptions
-  - verify that the plugin proof still tests true last-mile behavior, not CLI internals
-- `plugins/opencode-plugin-improved-todowrite/tests/integration/todowrite-plugin.test.ts`
-  - verify tool visibility and exact tool-call proof path under the current manager workflow
+- `plugins/opencode-plugin-prompt-transformer`
+- `plugins/opencode-plugin-improved-todowrite`
 
 ### 3. Re-audit `plugins/opencode-plugin-improved-task`
 
-- treat it as a thin wrapper over the existing manager CLI surface (`ocm` / current `opencode-manager`)
-- identify whether any purely local helper logic still needs extraction
-- do not recreate any standalone CLI for it
+- Treat it as a thin wrapper over the existing manager CLI surface (`ocm`).
+- Do not create a new standalone CLI for it.
 
-### 4. Re-run local plugin verification after the manager/workflow corrections
+### 4. Final sweep
 
-- plugin typechecks
-- last-mile integration tests
-- grep to confirm no wrapper code regressed to `git+file://`
-
-### 5. Only near the end, do publication and remote validation
-
-- push updated CLI repos
-- run remote `uvx --from git+https://... --help`
-- run one smoke command per CLI
-- then push updated plugin repos if needed
+- Run all plugin typechecks.
+- Grep for `git+file://` to confirm no regressions.
+- Update the durable checklist to reflect final state.
 
 ## Current Todo List
 
-- Keep `.serena/designs/2026-03-19-cli-recovery-execution-checklist.md` synchronized with actual repo state after each significant change
-- Repair `ocm`-dependent last-mile integration proofs for:
-  - `plugins/opencode-plugin-prompt-transformer`
-  - `plugins/opencode-plugin-improved-todowrite`
-- Re-audit `plugins/opencode-plugin-improved-task` around the real manager CLI surface and thin it accordingly
-- Publish updated CLI repos and run remote `uvx` validations near the end
-- Run final plugin typechecks, wrapper integration tests, and grep for `git+file://`
+- **[BLOCKED]** Merge PR #19 in `dzackgarza/opencode-manager` to unblock live test validation.
+- Run `just test` for `prompt-transformer` and `todowrite` after PR #19 merge.
+- Re-audit `plugins/opencode-plugin-improved-task` around real `ocm` surface.
+- Run final plugin typechecks and grep for `git+file://` in committed code.
 
 ## Notes
 

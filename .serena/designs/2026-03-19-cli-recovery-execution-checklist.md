@@ -160,8 +160,18 @@ Last updated: 2026-03-19
 
 ## Phase 5: Tests And Automation
 
+- [x] Keep plugin repos focused on wrapper and integration tests.
+- [x] Server management moved out of test code into justfile shell scripts for all plugins:
+  - [x] `opencode-plugin-improved-todowrite` — server lifecycle in justfile
+  - [x] `opencode-plugin-prompt-transformer` — server lifecycle in justfile
+  - [x] `opencode-memory-plugin` — server lifecycle in justfile
+  - [x] `opencode-zotero-plugin` — justfile standardized (no server needed yet)
+  - [x] `opencode-plugin-improved-webtools` — justfile added (uses opencode run, no server)
+  - [x] `opencode-plugin-reminder-injection` — no server changes needed (no integration tests)
+- [x] Integration tests read OPENCODE_BASE_URL from env (set by justfile), no inline spawning.
+- [x] All active plugin test configs extracted to `tests/integration/test-opencode.json`.
+- [~] `just test` for prompt-transformer and todowrite blocked on PR #19 merge in opencode-manager.
 - [ ] Restore or move tests so managers own core-logic tests.
-- [ ] Keep plugin repos focused on wrapper and integration tests.
 - [ ] Add `just` targets for managers.
 - [ ] Add lightweight hook-safe verification where appropriate.
 - [ ] Ensure docs present CLI-first usage first in manager repos.
@@ -180,6 +190,9 @@ Last updated: 2026-03-19
 ## Current Findings
 
 - All plugin wrapper code now points at remote git+https URLs (rewired 2026-03-21).
+- Server management migrated out of all plugin test files into justfile shell scripts (2026-03-21).
+- Both `prompt-transformer` and `todowrite` integration tests rewritten with correct ocm patterns.
+- PR #19 on dzackgarza/opencode-manager is the only blocker for live test validation.
 - `memory-manager` has been pushed to `origin/main` and no longer blocks remote-manager existence; it still needs explicit remote `uvx` validation and any remaining local follow-up sync.
 - `memory-manager` remote `uvx --help` validation now succeeds.
 - `zotero-manager`, `webtools-manager`, `todowrite-manager`, and `reminder-manager` now report upstream tracking on `origin/main`.
