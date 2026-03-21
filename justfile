@@ -95,14 +95,14 @@ test-sandbox-up:
 	#!/usr/bin/env bash
 	set -euo pipefail
 
-	# Refuse if already running
+	# Tear down any existing sandbox before provisioning a new one
 	if [[ -f "{{justfile_directory()}}/.test-sandbox-path" ]]; then
 	  sandbox=$(cat "{{justfile_directory()}}/.test-sandbox-path")
 	  if [[ -f "$sandbox/.pid" ]] && kill -0 "$(cat "$sandbox/.pid")" 2>/dev/null; then
-	    echo "Sandbox already running (pid $(cat "$sandbox/.pid"), path $sandbox)" >&2
-	    exit 1
+	    echo "Tearing down existing sandbox (pid $(cat "$sandbox/.pid"), path $sandbox)" >&2
+	    kill "$(cat "$sandbox/.pid")" 2>/dev/null || true
+	    sleep 0.5
 	  fi
-	  # Stale metadata — clean up
 	  rm -rf "$sandbox"
 	  rm -f "{{justfile_directory()}}/.test-sandbox-path" "{{justfile_directory()}}/.test-server.pid" "{{test_sandbox_env}}"
 	fi
