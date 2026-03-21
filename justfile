@@ -173,6 +173,7 @@ test-sandbox-up config envrc:
 	echo "$server_pid" > "$OPENCODE_TEST_SANDBOX/.pid"
 
 	# Health check: poll /global/health for up to 60s.
+	server_ready=false
 	deadline=$((SECONDS + 60))
 	while (( SECONDS < deadline )); do
 	  if ! kill -0 "$server_pid" 2>/dev/null; then
@@ -182,17 +183,51 @@ test-sandbox-up config envrc:
 	    exit 1
 	  fi
 	  if curl -sf "{{test_base_url}}/global/health" >/dev/null 2>&1; then
-	    echo "Sandbox ready at {{test_base_url}} (pid $server_pid)"
-	    exit 0
+	    server_ready=true
+	    break
 	  fi
 	  sleep 0.3
 	done
 
-	echo "Timed out waiting for server health check. Logs:" >&2
-	tail -30 "$OPENCODE_TEST_SANDBOX/server.log" >&2
-	kill "$server_pid" 2>/dev/null || true
-	rm -rf "$OPENCODE_TEST_SANDBOX"
-	exit 1
+	if ! $server_ready; then
+	  echo "Timed out waiting for server health check. Logs:" >&2
+	  tail -30 "$OPENCODE_TEST_SANDBOX/server.log" >&2
+	  kill "$server_pid" 2>/dev/null || true
+	  rm -rf "$OPENCODE_TEST_SANDBOX"
+	  exit 1
+	fi
+
+	echo "Sandbox HTTP ready at {{test_base_url}} (pid $server_pid)"
+
+	# Canary: verify the model actually responds before any plugin test runs.
+	# Uses direnv exec on the sandbox project dir — same env path as the actual tests.
+	# XDG_DATA_HOME must be passed so direnv can find the allow hashes written above.
+	# If this fails, auth is broken, the model is unavailable, or ocm can't connect.
+	CANARY_PHRASE="SANDBOX-CANARY-42"
+	echo "Running model canary check (timeout 60s)..." >&2
+	canary_out=$(
+	  timeout 60 \
+	    env XDG_DATA_HOME="$XDG_DATA_HOME" \
+	    direnv exec "$OPENCODE_TEST_PROJECT_DIR" \
+	    uvx --from git+https://github.com/dzackgarza/opencode-manager.git \
+	    ocm one-shot "Reply with EXACTLY this token and nothing else: $CANARY_PHRASE" \
+	    --agent plugin-proof \
+	    2>"$OPENCODE_TEST_SANDBOX/canary.log"
+	) || true
+
+	if ! printf '%s' "$canary_out" | grep -qF "$CANARY_PHRASE"; then
+	  echo "Canary FAILED: model did not respond with '$CANARY_PHRASE'." >&2
+	  echo "Got: $(printf '%s' "$canary_out" | head -3)" >&2
+	  echo "Canary stderr:" >&2
+	  tail -10 "$OPENCODE_TEST_SANDBOX/canary.log" >&2
+	  echo "Server logs:" >&2
+	  tail -20 "$OPENCODE_TEST_SANDBOX/server.log" >&2
+	  kill "$server_pid" 2>/dev/null || true
+	  rm -rf "$OPENCODE_TEST_SANDBOX"
+	  exit 1
+	fi
+
+	echo "Canary OK — model live in sandbox (got '$CANARY_PHRASE')"
 
 # Tear down the test sandbox: kill server and remove the fixed sandbox dir.
 [group('test')]
