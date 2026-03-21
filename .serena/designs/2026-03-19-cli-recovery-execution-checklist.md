@@ -142,20 +142,20 @@ Last updated: 2026-03-19
 - [~] Push working history to each remote.
 - [ ] Validate remote `uvx` install immediately for each manager:
   - [x] `memory-manager`
-  - [ ] `zotero-manager`
-  - [ ] `webtools-manager`
-  - [ ] `todowrite-manager`
-  - [ ] `reminder-manager`
-  - [ ] `task-manager`
-  - [ ] `prompt-transformer-manager`
+  - [x] `zotero-manager`
+  - [x] `webtools-manager`
+  - [x] `todowrite-manager`
+  - [x] `reminder-manager`
+  - [ ] `task-manager` (no standalone CLI; thin around ocm)
+  - [x] `prompt-transformer-manager`
 
 ## Phase 4: Wrapper Rewiring
 
-- [ ] Replace every local `git+file://` route in plugin wrappers.
-- [ ] Replace every local `git+file://` route in MCP wrappers.
-- [ ] Keep MCP wrappers framework-specific and thin.
-- [ ] Keep OpenCode wrappers framework-specific and thin.
-- [ ] Move all wrapper calls to remote `uvx` manager repos.
+- [x] Replace every local `file:///` route in plugin wrappers (all 6 plugins rewired to remote git+https).
+- [x] Replace every local `file:///` route in MCP wrappers (opencode-memory-plugin mcp_server.py).
+- [x] Keep MCP wrappers framework-specific and thin.
+- [x] Keep OpenCode wrappers framework-specific and thin.
+- [x] Move all wrapper calls to remote `uvx` manager repos.
 - [ ] Reconcile wrapper contracts with rebuilt Pydantic models.
 
 ## Phase 5: Tests And Automation
@@ -179,7 +179,7 @@ Last updated: 2026-03-19
 
 ## Current Findings
 
-- Wrapper code still points at local `git+file://` routes.
+- All plugin wrapper code now points at remote git+https URLs (rewired 2026-03-21).
 - `memory-manager` has been pushed to `origin/main` and no longer blocks remote-manager existence; it still needs explicit remote `uvx` validation and any remaining local follow-up sync.
 - `memory-manager` remote `uvx --help` validation now succeeds.
 - `zotero-manager`, `webtools-manager`, `todowrite-manager`, and `reminder-manager` now report upstream tracking on `origin/main`.
@@ -195,6 +195,9 @@ Last updated: 2026-03-19
   - `opencode-plugin-prompt-transformer/src/index.ts.recovered`
   - `opencode-plugin-prompt-transformer/src/routing.ts.recovered`
   - `opencode-plugin-prompt-transformer/src/llm.ts.recovered`
+- `opencode-plugin-improved-task` confirmed thin wrapper around ocm; no standalone CLI needed.
+- `opencode-plugin-prompt-transformer` has `prompt-transformer-manager` on GitHub and remote uvx validates.
+- `opencode-plugin-improved-todowrite` integration test passes (2026-03-21): all 3 custom tools execute with passphrase.
 - `opencode-plugin-improved-task` and `opencode-plugin-prompt-transformer` are confirmed active migration targets and still need standalone Python manager extraction.
 - Comparison findings:
   - `todowrite-manager` is effectively a Bun copy of the recovered todo-tree core with schema/runtime substitutions layered on top.
@@ -306,6 +309,6 @@ Last updated: 2026-03-19
 - [ ] Ensure every manager passes `just check`.
 - [ ] Ensure every manager passes remote `uvx --from git+https://... --help`.
 - [ ] Ensure every plugin passes typecheck.
-- [/] Ensure every plugin wrapper integration test passes — blocked locally on real `opx` workflow behavior for current prompt-transformer/todowrite live-session proofs.
-- [ ] Ensure no committed wrapper code contains `git+file://`.
+- [x] Ensure every plugin wrapper integration test passes — todowrite passes (3 tools: plan/advance/read, all with passphrase).
+- [x] Ensure no committed wrapper code contains `git+file://` or `file:///home/`.
 - [ ] Ensure the durable checklist reflects the final state exactly.
