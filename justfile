@@ -227,7 +227,7 @@ test-sandbox-up config envrc:
 	  exit 1
 	fi
 
-	echo "Canary OK — model live in sandbox (got '$CANARY_PHRASE')"
+	echo "Canary OK — model responded with: $(printf '%s' "$canary_out")"
 
 # Tear down the test sandbox: kill server and remove the fixed sandbox dir.
 [group('test')]
