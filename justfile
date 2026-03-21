@@ -91,9 +91,16 @@ test_sandbox_env := justfile_directory() + "/.test-sandbox-env.sh"
 # writes `.test-sandbox-env.sh` so package repos can source the exact runtime.
 # Optional override files are copied into the sandbox before startup.
 [group('test')]
-test-sandbox-up:
+test-sandbox-up config envrc:
 	#!/usr/bin/env bash
 	set -euo pipefail
+
+	# Load test environment from the plugin's .envrc chain (includes .testrc).
+	# Passphrases, agent names, and all test-specific vars must be defined there.
+	eval "$(cd "$(dirname "{{envrc}}")" && direnv export bash 2>/dev/null)" || {
+	  echo "error: failed to load env from {{envrc}} — run 'direnv allow' in that directory first" >&2
+	  exit 1
+	}
 
 	# Tear down any existing sandbox before provisioning a new one
 	if [[ -f "{{justfile_directory()}}/.test-sandbox-path" ]]; then
@@ -126,20 +133,23 @@ test-sandbox-up:
 	export OPENCODE_EXPERIMENTAL_LSP_TY="${OPENCODE_EXPERIMENTAL_LSP_TY:-1}"
 	export OPENCODE_EXPERIMENTAL_LSP_TOOL="${OPENCODE_EXPERIMENTAL_LSP_TOOL:-true}"
 
-	# Copy the global skeleton config first.
+	# Copy the real global config and auth into the sandbox so provider auth is preserved.
+	# Neither file is modified — they provide auth tokens, model defaults, and provider settings.
 	global_config="$HOME/.config/opencode/opencode.json"
 	if [[ -f "$global_config" ]]; then
 	  cp "$global_config" "$config_home/opencode/opencode.json"
 	fi
-	if [[ -n "${TEST_SANDBOX_CONFIG_JSON:-}" ]]; then
-	  cp "${TEST_SANDBOX_CONFIG_JSON}" "$config_home/opencode/opencode.json"
+	auth_json="${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json"
+	if [[ -f "$auth_json" ]]; then
+	  mkdir -p "$data_home/opencode"
+	  cp "$auth_json" "$data_home/opencode/auth.json"
 	fi
-	if [[ -n "${TEST_SANDBOX_CONFIG_PACKAGE_JSON:-}" ]]; then
-	  cp "${TEST_SANDBOX_CONFIG_PACKAGE_JSON}" "$config_home/opencode/package.json"
-	fi
-	if [[ -n "${TEST_SANDBOX_CONFIG_GITIGNORE:-}" ]]; then
-	  cp "${TEST_SANDBOX_CONFIG_GITIGNORE}" "$config_home/opencode/.gitignore"
-	fi
+
+	# Copy the per-test project config into the sandbox project dir.
+	# OpenCode discovers this as a project-level config and merges it on top of the
+	# global config — project settings (plugin, agent, model) override global defaults
+	# while provider auth from the global config is preserved unchanged.
+	cp "{{config}}" "$project_dir/opencode.json"
 
 	cat > "{{test_sandbox_env}}" <<-EOF
 	export HOME="$fake_home"
@@ -148,7 +158,6 @@ test-sandbox-up:
 	export XDG_STATE_HOME="$state_home"
 	export XDG_DATA_HOME="$data_home"
 	export OPENCODE_BASE_URL="{{test_base_url}}"
-	export OPENCODE_CONFIG="$config_home/opencode/opencode.json"
 	export OPENCODE_TEST_PROJECT_DIR="$project_dir"
 	export SERVER_URL="{{test_host}}"
 	export SERVER_PORT="{{test_port}}"
@@ -158,8 +167,22 @@ test-sandbox-up:
 	export OPENCODE_EXPERIMENTAL_LSP_TOOL="$OPENCODE_EXPERIMENTAL_LSP_TOOL"
 	EOF
 
-	# Start server with fully isolated env
-	HOME="$fake_home" XDG_CONFIG_HOME="$config_home" XDG_CACHE_HOME="$cache_home" XDG_STATE_HOME="$state_home" XDG_DATA_HOME="$data_home" OPENCODE_BASE_URL="{{test_base_url}}" OPENCODE_DISABLE_CLAUDE_CODE="$OPENCODE_DISABLE_CLAUDE_CODE" OPENCODE_ENABLE_EXA="$OPENCODE_ENABLE_EXA" OPENCODE_EXPERIMENTAL_LSP_TY="$OPENCODE_EXPERIMENTAL_LSP_TY" OPENCODE_EXPERIMENTAL_LSP_TOOL="$OPENCODE_EXPERIMENTAL_LSP_TOOL" opencode serve --hostname "{{test_host}}" --port "{{test_port}}" --print-logs --log-level INFO > "$sandbox/server.log" 2>&1 &
+	# Start server with a clean environment — no inherited shell vars, no leaked secrets.
+	# Auth comes exclusively from the copied config and auth.json files above.
+	# env -i clears the inherited env; PATH is passed explicitly so binaries resolve.
+	env -i \
+	  PATH="$PATH" \
+	  HOME="$fake_home" \
+	  XDG_CONFIG_HOME="$config_home" \
+	  XDG_CACHE_HOME="$cache_home" \
+	  XDG_STATE_HOME="$state_home" \
+	  XDG_DATA_HOME="$data_home" \
+	  OPENCODE_BASE_URL="{{test_base_url}}" \
+	  OPENCODE_DISABLE_CLAUDE_CODE="${OPENCODE_DISABLE_CLAUDE_CODE:-1}" \
+	  OPENCODE_ENABLE_EXA="${OPENCODE_ENABLE_EXA:-1}" \
+	  OPENCODE_EXPERIMENTAL_LSP_TY="${OPENCODE_EXPERIMENTAL_LSP_TY:-1}" \
+	  OPENCODE_EXPERIMENTAL_LSP_TOOL="${OPENCODE_EXPERIMENTAL_LSP_TOOL:-true}" \
+	  bash -c "cd '$project_dir' && opencode serve --hostname '{{test_host}}' --port '{{test_port}}' --print-logs --log-level INFO" > "$sandbox/server.log" 2>&1 &
 	server_pid=$!
 
 	# Record metadata

@@ -1,0 +1,32 @@
+# Single source of truth for the integration test sandbox environment.
+# This file is copied into the sandbox as $HOME/.envrc and direnv-allowed.
+# Plugin-specific .envrc files are copied into $OPENCODE_TEST_PROJECT_DIR/.envrc
+# with a source_up directive so they inherit everything defined here.
+#
+# NEVER define these vars in justfiles, test source, or plugin .envrc files.
+
+# Fixed sandbox root — all sandbox dirs live under here.
+export OPENCODE_TEST_SANDBOX="/tmp/opencode-test-sandbox"
+
+# Sandbox HOME and XDG dirs. Project dir lives inside HOME so source_up works.
+export HOME="$OPENCODE_TEST_SANDBOX/home"
+export XDG_CONFIG_HOME="$OPENCODE_TEST_SANDBOX/config"
+export XDG_CACHE_HOME="$OPENCODE_TEST_SANDBOX/cache"
+export XDG_STATE_HOME="$OPENCODE_TEST_SANDBOX/state"
+export XDG_DATA_HOME="$OPENCODE_TEST_SANDBOX/data"
+export OPENCODE_TEST_PROJECT_DIR="$HOME/project"
+
+# Test server
+export OPENCODE_BASE_URL="http://127.0.0.1:4097"
+
+# OpenCode flags
+export OPENCODE_DISABLE_CLAUDE_CODE=1
+export OPENCODE_ENABLE_EXA=1
+export OPENCODE_EXPERIMENTAL_LSP_TY=1
+export OPENCODE_EXPERIMENTAL_LSP_TOOL=true
+
+# Shared test vars — agent name used by all integration tests
+export OPENCODE_TEST_AGENT_NAME="plugin-proof"
+
+# Plugin-specific test vars
+export OPENCODE_MEMORY_TEST_SEED="FMEM-42"
