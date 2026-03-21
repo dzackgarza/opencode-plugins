@@ -30,3 +30,4 @@ export OPENCODE_TEST_AGENT_NAME="plugin-proof"
 
 # Plugin-specific test vars
 export OPENCODE_MEMORY_TEST_SEED="FMEM-42"
+export OPENCODE_MEMORY_ROOT="$OPENCODE_TEST_SANDBOX/memory-data"
