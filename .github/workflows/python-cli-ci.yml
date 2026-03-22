@@ -1,0 +1,96 @@
+name: Reusable Python CLI CI
+'on':
+  workflow_call:
+    inputs:
+      python_version:
+        required: false
+        type: string
+        default: '3.13'
+      node_version:
+        required: false
+        type: string
+        default: '22'
+      use_opencode_server:
+        required: false
+        type: boolean
+        default: false
+      ai_support_repository:
+        required: false
+        type: string
+        default: dzackgarza/ai
+      ai_support_ref:
+        required: false
+        type: string
+        default: main
+    secrets:
+      OPENCODE_AUTH_JSON:
+        required: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+    steps:
+    - uses: actions/checkout@v4
+    - name: Checkout shared QC support
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.ai_support_repository }}
+        ref: ${{ inputs.ai_support_ref }}
+        path: _ci-support/ai
+    - name: Install system dependencies
+      run: 'sudo apt-get update
+
+        sudo apt-get install -y direnv'
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node_version }}
+    - uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+    - uses: taiki-e/install-action@just
+    - name: Set up Python
+      run: uv python install ${{ inputs.python_version }}
+    - name: Prepare CI environment
+      shell: bash
+      run: "set -euo pipefail\necho \"OPENCODE_PYTHON_QC_JUSTFILE=$GITHUB_WORKSPACE/_ci-support/ai/quality-control/justfile\"\
+        \ >> \"$GITHUB_ENV\"\nif [[ \"${{ inputs.use_opencode_server }}\" == \"true\"\
+        \ ]]; then\n  echo \"OPENCODE_BASE_URL=http://127.0.0.1:4097\" >> \"$GITHUB_ENV\"\
+        \nfi"
+    - name: Trust direnv
+      if: ${{ hashFiles('.envrc') != '' }}
+      run: direnv allow .
+    - name: Install dependencies
+      run: just --justfile justfile install
+    - name: Install OpenCode CLI
+      if: ${{ inputs.use_opencode_server }}
+      run: npm install -g opencode-ai
+    - name: Write OpenCode auth
+      if: ${{ inputs.use_opencode_server }}
+      shell: bash
+      env:
+        OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+      run: "set -euo pipefail\nif [[ -z \"${OPENCODE_AUTH_JSON:-}\" ]]; then\n  echo\
+        \ \"Missing required secret OPENCODE_AUTH_JSON for live OpenCode proofs.\"\
+        \ >&2\n  exit 1\nfi\nmkdir -p \"$HOME/.local/share/opencode\"\nprintf '%s'\
+        \ \"$OPENCODE_AUTH_JSON\" > \"$HOME/.local/share/opencode/auth.json\""
+    - name: Start OpenCode proof server
+      if: ${{ inputs.use_opencode_server }}
+      shell: bash
+      run: "set -euo pipefail\nnohup opencode serve --hostname 127.0.0.1 --port 4097\
+        \ --print-logs --log-level INFO > \"$RUNNER_TEMP/opencode-serve.log\" 2>&1\
+        \ < /dev/null &\necho \"$!\" > \"$RUNNER_TEMP/opencode-serve.pid\"\nfor _\
+        \ in $(seq 1 120); do\n  if curl -sf http://127.0.0.1:4097/global/health >/dev/null;\
+        \ then\n    exit 0\n  fi\n  sleep 1\ndone\ntail -50 \"$RUNNER_TEMP/opencode-serve.log\"\
+        \ >&2 || true\necho \"Timed out waiting for OpenCode proof server.\" >&2\n\
+        exit 1"
+    - name: Run checks
+      run: just --justfile justfile check
+    - name: Stop OpenCode proof server
+      if: ${{ always() && inputs.use_opencode_server }}
+      shell: bash
+      run: "set -euo pipefail\nif [[ -f \"$RUNNER_TEMP/opencode-serve.pid\" ]]; then\n\
+        \  pid=$(cat \"$RUNNER_TEMP/opencode-serve.pid\")\n  kill \"$pid\" 2>/dev/null\
+        \ || true\n  wait \"$pid\" 2>/dev/null || true\nfi"
