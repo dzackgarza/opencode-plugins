@@ -66,13 +66,16 @@ jobs:
     - name: Start OpenCode proof server
       if: ${{ inputs.use_opencode_server }}
       shell: bash
-      run: "set -euo pipefail\nnohup opencode serve --hostname 127.0.0.1 --port 4097\
-        \ --print-logs --log-level INFO > \"$RUNNER_TEMP/opencode-serve.log\" 2>&1\
-        \ < /dev/null &\necho \"$!\" > \"$RUNNER_TEMP/opencode-serve.pid\"\nfor _\
-        \ in $(seq 1 120); do\n  if curl -sf http://127.0.0.1:4097/global/health >/dev/null;\
-        \ then\n    exit 0\n  fi\n  sleep 1\ndone\ntail -50 \"$RUNNER_TEMP/opencode-serve.log\"\
-        \ >&2 || true\necho \"Timed out waiting for OpenCode proof server.\" >&2\n\
-        exit 1"
+      run: "set -euo pipefail\nif [[ -f .envrc ]]; then\n  nohup direnv exec \"$GITHUB_WORKSPACE\"\
+        \ opencode serve --hostname 127.0.0.1 --port 4097 --print-logs --log-level\
+        \ INFO > \"$RUNNER_TEMP/opencode-serve.log\" 2>&1 < /dev/null &\nelse\n  nohup\
+        \ opencode serve --hostname 127.0.0.1 --port 4097 --print-logs --log-level\
+        \ INFO > \"$RUNNER_TEMP/opencode-serve.log\" 2>&1 < /dev/null &\nfi\necho\
+        \ \"$!\" > \"$RUNNER_TEMP/opencode-serve.pid\"\nfor _ in $(seq 1 120); do\n\
+        \  if curl -sf http://127.0.0.1:4097/global/health >/dev/null; then\n    exit\
+        \ 0\n  fi\n  sleep 1\ndone\ntail -50 \"$RUNNER_TEMP/opencode-serve.log\" >&2\
+        \ || true\necho \"Timed out waiting for OpenCode proof server.\" >&2\nexit\
+        \ 1"
     - name: Run checks
       run: just --justfile justfile check
     - name: Stop OpenCode proof server
