@@ -1,30 +1,53 @@
-# Improved Jules CLI
+set fallback := true
+repo_root := justfile_directory()
 
-# Install the package in dev mode
+default:
+    @just test
+
 install:
-    uv pip install -e .
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{repo_root}}"
+    exec uv sync
 
-# Set API key
 set-key:
     @echo "Run: jules-cli config-set-api-key YOUR_API_KEY"
     @echo "Or set JULES_API_KEY env var"
 
-# List sessions
 list:
     jules-cli list
 
-# Watch a session
 watch ID:
     jules-cli watch {{ID}}
 
-# Re-prompt a session  
 reprompt ID MESSAGE:
     jules-cli re-prompt {{ID}} "{{MESSAGE}}"
 
-# Run tests
-test:
-    echo "No tests yet"
+[private]
+_lint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{repo_root}}"
+    exec uvx ruff check .
 
-# Lint
-lint:
-    echo "No linter configured"
+[private]
+_format:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{repo_root}}"
+    exec uvx ruff format .
+
+[private]
+_typecheck:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{repo_root}}"
+    exec uvx basedpyright
+
+test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "No tests directory found in {{repo_root}}. Add tests before enabling the quality-control gate." >&2
+    exit 1
+
+check: test

@@ -3,6 +3,20 @@ set fallback := true
 
 plugins := "opencode-plugin-improved-task opencode-plugin-improved-todowrite opencode-plugin-improved-webtools opencode-plugin-mcp-shim opencode-manager opencode-postgres-memory-plugin opencode-time-travel-plugin opencode-zotero-plugin opencode-plugin-prompt-transformer opencode-plugin-reminder-injection"
 
+default:
+	@just --list
+
+[private]
+_run-plugin-recipe recipe:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	for plugin in {{plugins}}; do
+		if [[ -f "$plugin/justfile" ]]; then
+			echo "Running {{recipe}} for $plugin"
+			just --justfile "$plugin/justfile" --working-directory "$plugin" "{{recipe}}"
+		fi
+	done
+
 # Synchronize package.json repository URLs with actual git remotes
 sync-all-metadata:
 	#!/usr/bin/env bash
@@ -17,35 +31,22 @@ sync-all-metadata:
 
 # Setup npm trusted publisher for ALL plugins
 setup-all-npm-trust:
-	#!/usr/bin/env bash
-	for plugin in {{plugins}}; do
-		echo "Trusting $plugin"
-		just --justfile "$plugin/justfile" --working-directory "$plugin" setup-npm-trust
-	done
+	just --justfile "{{justfile()}}" _run-plugin-recipe setup-npm-trust
 
 # Initial publish for ALL plugins
 publish-all:
-	#!/usr/bin/env bash
-	for plugin in {{plugins}}; do
-		echo "Publishing $plugin"
-		just --justfile "$plugin/justfile" --working-directory "$plugin" publish
-	done
+	just --justfile "{{justfile()}}" _run-plugin-recipe publish
 
-# Run typecheck for all plugins
-check-all:
-	#!/usr/bin/env bash
-	for plugin in {{plugins}}; do
-		if grep -q "typecheck:" "$plugin/justfile"; then
-			echo "Typechecking $plugin"
-			just --justfile "$plugin/justfile" --working-directory "$plugin" typecheck
-		fi
-	done
+# Run the public verification gate for all package repos.
+test-all:
+	just --justfile "{{justfile()}}" _run-plugin-recipe test
 
 # Dashboard recipes
-check-dashboard:
+[private]
+_check-dashboard:
 	@bunx tsc dashboard.ts --noEmit --esModuleInterop --skipLibCheck --target esnext --lib esnext,dom
 
-build-dashboard: check-dashboard
+build-dashboard: _check-dashboard
 	@bunx tsc dashboard.ts --outFile /home/dzack/www/html/dashboard.js --esModuleInterop --skipLibCheck --target esnext --lib esnext,dom
 
 refresh-dashboard-token:
@@ -129,12 +130,13 @@ test-sandbox-up config envrc:
 	  "$HOME" \
 	  "$OPENCODE_TEST_PROJECT_DIR"
 
-	# .testrc is the single source of truth for test env vars.
-	# Copy it into sandbox HOME as .envrc so direnv exec loads it for the server.
-	cp "{{justfile_directory()}}/.testrc" "$HOME/.envrc"
-	# Store allow hashes in sandbox XDG_DATA_HOME so direnv exec finds them
-	# when running under env -i (which has no access to the real user's allow db).
-	XDG_DATA_HOME="$XDG_DATA_HOME" direnv allow "$HOME/.envrc"
+		# .testrc is the single source of truth for test env vars.
+		# Copy it into sandbox HOME as .envrc so direnv exec loads it for the server.
+		cp "{{justfile_directory()}}/.testrc" "$HOME/.envrc"
+		printf '\nexport OPENCODE_PLUGIN_WORKSPACE_ROOT=%q\n' "{{justfile_directory()}}" >> "$HOME/.envrc"
+		# Store allow hashes in sandbox XDG_DATA_HOME so direnv exec finds them
+		# when running under env -i (which has no access to the real user's allow db).
+		XDG_DATA_HOME="$XDG_DATA_HOME" direnv allow "$HOME/.envrc"
 
 	# Copy plugin .envrc into project dir. It must use source_up so direnv's
 	# traversal finds $HOME/.envrc (= .testrc copy) since OPENCODE_TEST_PROJECT_DIR
@@ -160,13 +162,16 @@ test-sandbox-up config envrc:
 	# Start server with a clean environment.
 	# env -i clears all inherited vars (no GITHUB_TOKEN PAT leakage, no stray secrets).
 	# direnv exec loads only what's defined in the .testrc chain via source_up.
-	env -i \
+	# nohup detaches the server from this recipe shell so it survives after
+	# test-sandbox-up returns; without it, the canary can pass and the shell
+	# exit still tears the server down before the actual test command starts.
+	nohup env -i \
 	  HOME="$HOME" \
 	  PATH="$PATH" \
 	  XDG_DATA_HOME="$XDG_DATA_HOME" \
 	  direnv exec "$OPENCODE_TEST_PROJECT_DIR" \
 	  bash -c "opencode serve --hostname '{{test_host}}' --port '{{test_port}}' --print-logs --log-level INFO" \
-	  > "$OPENCODE_TEST_SANDBOX/server.log" 2>&1 &
+	  > "$OPENCODE_TEST_SANDBOX/server.log" 2>&1 < /dev/null &
 	server_pid=$!
 
 	# Record PID in sandbox — teardown reads it from here.
@@ -204,13 +209,13 @@ test-sandbox-up config envrc:
 	# XDG_DATA_HOME must be passed so direnv can find the allow hashes written above.
 	# If this fails, auth is broken, the model is unavailable, or ocm can't connect.
 	CANARY_PHRASE="SANDBOX-CANARY-42"
-	echo "Running model canary check (timeout 60s)..." >&2
-	canary_out=$(
-	  timeout 60 \
-	    env XDG_DATA_HOME="$XDG_DATA_HOME" \
-	    direnv exec "$OPENCODE_TEST_PROJECT_DIR" \
-	    bash -c "cd '$OPENCODE_TEST_PROJECT_DIR' && uvx --from git+https://github.com/dzackgarza/opencode-manager.git ocm one-shot 'Reply with EXACTLY this token and nothing else: $CANARY_PHRASE' --agent plugin-proof" \
-	    2>"$OPENCODE_TEST_SANDBOX/canary.log"
+		echo "Running model canary check (timeout 120s)..." >&2
+		canary_out=$(
+		  timeout 120 \
+		    env XDG_DATA_HOME="$XDG_DATA_HOME" \
+		    direnv exec "$OPENCODE_TEST_PROJECT_DIR" \
+		    bash -c "cd '$OPENCODE_TEST_PROJECT_DIR' && uvx --from git+https://github.com/dzackgarza/opencode-manager.git ocm one-shot 'Reply with EXACTLY this token and nothing else: $CANARY_PHRASE' --agent plugin-proof" \
+		    2>"$OPENCODE_TEST_SANDBOX/canary.log"
 	) || true
 
 	if ! printf '%s' "$canary_out" | grep -qF "$CANARY_PHRASE"; then

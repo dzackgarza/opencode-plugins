@@ -1,139 +1,150 @@
 # Continuation
 
-## Current Situation
+This file is the active OSOT for the CI-first proof migration.
 
-The workspace has been reorganized into:
+## Goal
 
-- `plugins/` - OpenCode plugins and MCP wrappers
-- `clis/` - standalone CLI/tool repos
+Use one centralized CI recipe family for this workspace, have repo-local packages inherit from it, and rely on standard OpenCode config discovery instead of manual config or path overrides.
 
-Valid standalone CLI targets:
+## Active Direction
 
-- `plugins/opencode-memory-plugin` -> `clis/memory-manager`
-- `plugins/opencode-zotero-plugin` -> `clis/zotero-librarian`
-- `plugins/opencode-plugin-improved-webtools` -> `clis/webtools`
-- `plugins/opencode-plugin-improved-todowrite` -> `clis/todowrite`
-- `plugins/opencode-plugin-prompt-transformer` -> `clis/prompt-transformer`
-- `plugins/opencode-plugin-reminder-injection` -> `clis/skill-suggester`
+- CI owns the proof environment.
+- Local repos inherit the reusable workflows in this repo instead of carrying bespoke CI logic.
+- OpenCode proof runs use normal precedence:
+  - global `~/.config/opencode/opencode.json`
+  - repo-root `opencode.json`
+- Do not use `OPENCODE_CONFIG` or `OPENCODE_CONFIG_DIR` for these repos unless a real documented exception appears.
+- Do not use `OPENCODE_TEST_AGENT_NAME` or `OPENCODE_TEST_PROJECT_DIR` as a proof harness shim.
+- `just test` is the canonical local test entrypoint, but it does not start or stop `opencode serve`.
+- Local debugging starts a repo-local `opencode serve` separately and points tests at it with `OPENCODE_BASE_URL`.
 
-Important correction:
+## Historical References
 
-- `plugins/opencode-plugin-improved-task` should not map to a fabricated standalone CLI.
-- It should thin around the existing OpenCode manager CLI surface.
-- The old local `clis/delegate-task` extraction was invalid and has been retired.
+These are retained as background context for why the migration exists:
 
-## Existing Plans / References
+- [.serena/designs/2026-03-19-cli-recovery-execution-checklist.md](/home/dzack/opencode-plugins/.serena/designs/2026-03-19-cli-recovery-execution-checklist.md)
+- [recovery-plan-repair-damaged-r-2026-03-19-approved.md](/home/dzack/.plannotator/plans/recovery-plan-repair-damaged-r-2026-03-19-approved.md)
 
-- Durable execution checklist:
-  - `.serena/designs/2026-03-19-cli-recovery-execution-checklist.md`
-- Most recently accepted revised plan:
-  - `/home/dzack/.plannotator/plans/recovery-plan-repair-damaged-r-2026-03-19-approved.md`
-- Earlier memory-plugin design doc:
-  - `.serena/designs/2026-03-18-memory-plugin-refactor-design.md`
+Additional Claude plan files under `/home/dzack/.claude/plans/` were reviewed in the earlier audit phase and then removed during cleanup. The retired repo-local `CONTINUATION_TRIAGE.md` handoff was also removed after its decisions were folded into this file.
 
-## Current Local State
+## Canonical CI Templates
 
-Locally green CLI repos:
+The reusable workflow templates that now define the supported CI shapes are:
 
-- `clis/webtools`
-- `clis/todowrite`
-- `clis/skill-suggester`
-- `clis/prompt-transformer`
-- `clis/memory-manager`
-- `clis/zotero-librarian` (under recorded first-pass scope decisions)
+- [.github/workflows/python-cli-ci.yml](/home/dzack/opencode-plugins/.github/workflows/python-cli-ci.yml)
+- [.github/workflows/python-cli-publish.yml](/home/dzack/opencode-plugins/.github/workflows/python-cli-publish.yml)
+- [.github/workflows/bun-plugin-ci.yml](/home/dzack/opencode-plugins/.github/workflows/bun-plugin-ci.yml)
+- [.github/workflows/bun-plugin-publish.yml](/home/dzack/opencode-plugins/.github/workflows/bun-plugin-publish.yml)
 
-Locally updated plugin wrappers:
+The intended behavior is:
 
-- `plugins/opencode-memory-plugin`
-- `plugins/opencode-zotero-plugin`
-- `plugins/opencode-plugin-improved-webtools`
-- `plugins/opencode-plugin-improved-todowrite`
-- `plugins/opencode-plugin-reminder-injection`
-- `plugins/opencode-plugin-prompt-transformer`
+- caller repos only declare `uses: dzackgarza/opencode-plugins/.github/workflows/...@main`
+- Python CLI repos inherit shared QC through `OPENCODE_PYTHON_QC_JUSTFILE`
+- Bun plugin repos run repo-owned `just` gates directly
+- OpenCode live-proof jobs start `opencode serve` from the caller repo checkout so repo-root `opencode.json` is discovered normally
 
-Local wrapper routing status:
+## Adoption Status
 
-- All live wrapper code uses remote `git+https://github.com/dzackgarza/...` by default (overridable via env vars)
-- No `git+file://` in any committed plugin source
+### Python CLI repos using centralized workflows
 
-Plugin test infrastructure status:
+- [clis/opencode-manager/.github/workflows/ci.yml](/home/dzack/opencode-plugins/clis/opencode-manager/.github/workflows/ci.yml)
+- [clis/opencode-manager/.github/workflows/publish.yml](/home/dzack/opencode-plugins/clis/opencode-manager/.github/workflows/publish.yml)
+- [clis/llm-templating-engine/.github/workflows/ci.yml](/home/dzack/opencode-plugins/clis/llm-templating-engine/.github/workflows/ci.yml)
+- [clis/llm-templating-engine/.github/workflows/publish.yml](/home/dzack/opencode-plugins/clis/llm-templating-engine/.github/workflows/publish.yml)
+- [clis/llm-runner/.github/workflows/ci.yml](/home/dzack/opencode-plugins/clis/llm-runner/.github/workflows/ci.yml)
+- [clis/llm-runner/.github/workflows/publish.yml](/home/dzack/opencode-plugins/clis/llm-runner/.github/workflows/publish.yml)
+- [clis/usage-limits/.github/workflows/check.yml](/home/dzack/opencode-plugins/clis/usage-limits/.github/workflows/check.yml)
+- [clis/usage-limits/.github/workflows/publish.yml](/home/dzack/opencode-plugins/clis/usage-limits/.github/workflows/publish.yml)
 
-- All 6 plugins now ship static `tests/integration/opencode.json` (absolute plugin URL + restricted agent)
-- All 6 plugin justfiles delegate test lifecycle to root `test-sandbox-up`/`test-sandbox-down`
-- Zero server spawning or config management in test code
+### Bun plugin repos using centralized workflows
 
-## Known Local Blockers
+- [plugins/opencode-memory-plugin/.github/workflows/ci.yml](/home/dzack/opencode-plugins/plugins/opencode-memory-plugin/.github/workflows/ci.yml)
+- [plugins/opencode-memory-plugin/.github/workflows/publish.yml](/home/dzack/opencode-plugins/plugins/opencode-memory-plugin/.github/workflows/publish.yml)
+- [plugins/opencode-plugin-improved-task/.github/workflows/ci.yml](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-task/.github/workflows/ci.yml)
+- [plugins/opencode-plugin-improved-task/.github/workflows/publish.yml](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-task/.github/workflows/publish.yml)
+- [plugins/opencode-plugin-improved-todowrite/.github/workflows/ci.yml](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-todowrite/.github/workflows/ci.yml)
+- [plugins/opencode-plugin-improved-todowrite/.github/workflows/publish.yml](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-todowrite/.github/workflows/publish.yml)
+- [plugins/opencode-plugin-improved-webtools/.github/workflows/ci.yml](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-webtools/.github/workflows/ci.yml)
+- [plugins/opencode-plugin-improved-webtools/.github/workflows/publish.yml](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-webtools/.github/workflows/publish.yml)
+- [plugins/opencode-plugin-prompt-transformer/.github/workflows/ci.yml](/home/dzack/opencode-plugins/plugins/opencode-plugin-prompt-transformer/.github/workflows/ci.yml)
+- [plugins/opencode-plugin-prompt-transformer/.github/workflows/publish.yml](/home/dzack/opencode-plugins/plugins/opencode-plugin-prompt-transformer/.github/workflows/publish.yml)
+- [plugins/opencode-plugin-reminder-injection/.github/workflows/ci.yml](/home/dzack/opencode-plugins/plugins/opencode-plugin-reminder-injection/.github/workflows/ci.yml)
+- [plugins/opencode-plugin-reminder-injection/.github/workflows/publish.yml](/home/dzack/opencode-plugins/plugins/opencode-plugin-reminder-injection/.github/workflows/publish.yml)
+- [plugins/opencode-zotero-plugin/.github/workflows/ci.yml](/home/dzack/opencode-plugins/plugins/opencode-zotero-plugin/.github/workflows/ci.yml)
+- [plugins/opencode-zotero-plugin/.github/workflows/publish.yml](/home/dzack/opencode-plugins/plugins/opencode-zotero-plugin/.github/workflows/publish.yml)
 
-- **[BLOCKED on PR #19 merge in dzackgarza/opencode-manager]**
-  - Both `prompt-transformer` and `todowrite` integration tests use `ocm begin-session`.
-  - Local `clis/opencode-manager` has the fix (`submit_prompt_no_wait`).
-  - Published GitHub main still uses blocking `submit_prompt` → tests fail live.
-  - PR #19 needs merge before either test can be validated green.
+## Repo Contract Decisions Captured In Code
 
-## Git Pushes Still Needed
+### Justfiles and `.envrc`
 
-These repos have local work that should eventually be pushed:
+- plugin repos no longer source workspace `.testrc`
+- plugin repos use `source_up_if_exists` instead of assuming a parent env file exists
+- plugin `justfile`s no longer spin up or tear down a top-level sandbox
+- package.json test/typecheck/check scripts point to `just --justfile justfile ...`
 
-- root repo `opencode-plugins` (for checklist / continuation docs)
-- `clis/webtools`
-- `clis/todowrite`
-- `clis/skill-suggester`
-- `clis/prompt-transformer`
-- `plugins/opencode-plugin-prompt-transformer`
-- `plugins/opencode-plugin-reminder-injection`
-- `plugins/opencode-plugin-improved-todowrite`
-- `plugins/opencode-plugin-improved-webtools`
-- `plugins/opencode-memory-plugin`
-- `plugins/opencode-zotero-plugin`
+### Repo-root `opencode.json`
 
-Probably not needed yet:
+Repo-root `opencode.json` is now the canonical proof config for every migrated plugin repo:
 
-- `plugins/opencode-plugin-improved-task` until the `ocm`-based local rewrite is done
-- `clis/opencode-manager` unless local changes are made there
+- [plugins/opencode-memory-plugin/opencode.json](/home/dzack/opencode-plugins/plugins/opencode-memory-plugin/opencode.json)
+- [plugins/opencode-plugin-improved-task/opencode.json](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-task/opencode.json)
+- [plugins/opencode-plugin-improved-todowrite/opencode.json](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-todowrite/opencode.json)
+- [plugins/opencode-plugin-improved-webtools/opencode.json](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-webtools/opencode.json)
+- [plugins/opencode-plugin-prompt-transformer/opencode.json](/home/dzack/opencode-plugins/plugins/opencode-plugin-prompt-transformer/opencode.json)
+- [plugins/opencode-plugin-reminder-injection/opencode.json](/home/dzack/opencode-plugins/plugins/opencode-plugin-reminder-injection/opencode.json)
+- [plugins/opencode-zotero-plugin/opencode.json](/home/dzack/opencode-plugins/plugins/opencode-zotero-plugin/opencode.json)
 
-## Immediate Next Actions
+Important details:
 
-### 1. Merge PR #19 in dzackgarza/opencode-manager
+- `plugin-proof` remains the standard agent name for ordinary plugin proofs
+- repo-local `agent.plugin-proof` overrides are used only to specialize prompt/description/permissions through normal config precedence
+- `opencode-plugin-improved-task` keeps repo-local custom agents because it proves both `improved_task` and shadow `task`
+- redundant `tests/integration/test-opencode.json` fixtures were deleted from:
+  - `opencode-memory-plugin`
+  - `opencode-plugin-improved-todowrite`
+  - `opencode-plugin-prompt-transformer`
 
-- The fix (`submit_prompt_no_wait`) is already in the local repo at `clis/opencode-manager`.
-- Merging PR #19 unblocks live `just test` validation for both prompt-transformer and todowrite.
+### Integration harness cleanup
 
-### 2. Run `just test` for both fixed plugins (after PR #19 merge)
+The plugin integration suites no longer depend on stale harness env vars:
 
-- `plugins/opencode-plugin-prompt-transformer`
-- `plugins/opencode-plugin-improved-todowrite`
+- `OPENCODE_TEST_AGENT_NAME` removed from plugin tests in favor of fixed repo-owned agent names
+- `OPENCODE_TEST_PROJECT_DIR` removed from plugin tests in favor of running from repo root
+- comments claiming `just test` starts or tears down the OpenCode server were removed
 
-### 3. ~~Re-audit `plugins/opencode-plugin-improved-task`~~ DONE
+The affected tests are:
 
-- Audited 2026-03-21: plugin correctly uses `ocm` for transcript + native client API for lifecycle.
-- No dead binaries. No standalone CLI needed.
+- [plugins/opencode-memory-plugin/tests/integration/memory-plugin.test.ts](/home/dzack/opencode-plugins/plugins/opencode-memory-plugin/tests/integration/memory-plugin.test.ts)
+- [plugins/opencode-plugin-improved-task/tests/integration/task-plugin.test.ts](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-task/tests/integration/task-plugin.test.ts)
+- [plugins/opencode-plugin-improved-todowrite/tests/integration/todowrite-plugin.test.ts](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-todowrite/tests/integration/todowrite-plugin.test.ts)
+- [plugins/opencode-plugin-improved-webtools/tests/integration/webtools-plugin.test.ts](/home/dzack/opencode-plugins/plugins/opencode-plugin-improved-webtools/tests/integration/webtools-plugin.test.ts)
+- [plugins/opencode-plugin-prompt-transformer/tests/integration/prompt-router.test.ts](/home/dzack/opencode-plugins/plugins/opencode-plugin-prompt-transformer/tests/integration/prompt-router.test.ts)
+- [plugins/opencode-plugin-reminder-injection/tests/integration/reminder-injection.test.ts](/home/dzack/opencode-plugins/plugins/opencode-plugin-reminder-injection/tests/integration/reminder-injection.test.ts)
+- [plugins/opencode-zotero-plugin/tests/integration/zotero-plugin.test.ts](/home/dzack/opencode-plugins/plugins/opencode-zotero-plugin/tests/integration/zotero-plugin.test.ts)
 
-### 4. Push all plugin submodule commits
+## Validation Completed
 
-The following plugin submodules have unpushed local commits:
+- `just --list` succeeds for the root `justfile`
+- `just --list` succeeds for all migrated plugin `justfile`s
+- root reusable workflow YAML parses
+- plugin caller workflow YAML parses
+- repo-root plugin `opencode.json` files parse as JSON
+- modified MCP server Python files compile
+- migrated plugin TypeScript suites typecheck through repo-local `just typecheck`
 
-- `plugins/opencode-plugin-improved-todowrite`
-- `plugins/opencode-plugin-prompt-transformer`
-- `plugins/opencode-memory-plugin`
-- `plugins/opencode-plugin-improved-webtools`
-- `plugins/opencode-plugin-reminder-injection`
-- `plugins/opencode-zotero-plugin`
+## Remaining Blockers
 
-### 5. Final sweep (after pushes)
+- The reusable workflow changes must land before the caller workflow updates can pass in GitHub Actions.
+- The decisive proof is the first clean CI run with real secrets and auth, not local static validation.
+- If the first CI run fails, inspect these first:
+  - repo-root `opencode.json` discovery from the caller checkout
+  - `OPENCODE_AUTH_JSON` secret materialization
+  - proof-agent visibility through standard global-plus-project config merge
 
-- Run all plugin typechecks.
-- Run `just test` for all plugins after PR #19 merge.
-- Grep for `git+file://` to confirm no regressions.
+## Do Not Reintroduce
 
-## Current Todo List
-
-- **[BLOCKED]** Merge PR #19 in `dzackgarza/opencode-manager` to unblock live test validation.
-- Push all plugin submodule commits (see section 4 above).
-- Run `just test` for all plugins after PR #19 merge.
-- Run final plugin typechecks and grep for `git+file://` in committed code.
-
-## Notes
-
-- Do not spend more time on fake standalone extraction for `improved-task`.
-- Do not reintroduce `git+file://` in wrapper code.
-- If a repo rename changes package metadata again, expect local venv wrapper/shebang churn; rebuilding `.venv` may be necessary.
+- no sandbox startup or teardown recipes for CI
+- no `.testrc`-driven proof harness
+- no `OPENCODE_CONFIG` / `OPENCODE_CONFIG_DIR` overrides for this migration
+- no repo-local duplicate workflow logic when a centralized reusable workflow already exists
+- no dead `tests/integration/test-opencode.json` sidecar configs when the repo-root `opencode.json` owns the proof contract

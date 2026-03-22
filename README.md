@@ -15,17 +15,12 @@ Collection of standalone OpenCode plugin packages and shared support code.
 
 ## Testing
 
-Integration tests run against an isolated opencode server that cannot see host configs. The top-level justfile manages the sandbox lifecycle:
+CI owns proof execution. Python CLI repos should call the centralized reusable workflows at [`python-cli-ci.yml`](/home/dzack/opencode-plugins/.github/workflows/python-cli-ci.yml) and [`python-cli-publish.yml`](/home/dzack/opencode-plugins/.github/workflows/python-cli-publish.yml) instead of inventing repo-local CI logic.
 
-```bash
-just test-sandbox-up     # creates tmpdir, starts opencode serve on 127.0.0.1:4097, health-checks
-just test-sandbox-down   # kills server, removes tmpdir
-```
+When a proof workflow needs OpenCode, rely on standard config precedence:
 
-`test-sandbox-up` creates a tmpdir with isolated `HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_STATE_HOME`, `XDG_DATA_HOME`, and a sandbox-local project directory. It writes the exact runtime exports to `.test-sandbox-env.sh`, copies the global opencode config (`~/.config/opencode/opencode.json`) into the sandbox as the default skeleton, then starts a dedicated `opencode serve` instance and waits for `/global/health` to return before completing.
+- global config at `~/.config/opencode/opencode.json` when needed
+- project config at repo-root `opencode.json`
+- no `OPENCODE_CONFIG` / `OPENCODE_CONFIG_DIR` path overrides unless there is a documented reason they are required
 
-The canonical test address is always `http://127.0.0.1:4097`.
-
-**Package-specific overrides:** If a package needs custom agents, plugin installation by file path or git, or stricter default-agent permissions, export `TEST_SANDBOX_CONFIG_JSON` (and the companion `TEST_SANDBOX_CONFIG_PACKAGE_JSON` / `TEST_SANDBOX_CONFIG_GITIGNORE` values when needed) before `test-sandbox-up` so the sandbox is populated before the server starts. Refer to the OpenCode docs for config resolution order when deciding whether an override belongs in the copied global config or in the sandbox-local project directory.
-
-Refer to individual package READMEs for plugin-specific test details. For a compliance rubric, see the `opencode-plugin-development` skill.
+The older sandbox recipes are no longer the CI source of truth. Refer to individual package READMEs and [`CONTINUATION.md`](/home/dzack/opencode-plugins/CONTINUATION.md) for the active migration state.
