@@ -25,7 +25,7 @@ These are retained as background context for why the migration exists:
 - [.serena/designs/2026-03-19-cli-recovery-execution-checklist.md](/home/dzack/opencode-plugins/.serena/designs/2026-03-19-cli-recovery-execution-checklist.md)
 - [recovery-plan-repair-damaged-r-2026-03-19-approved.md](/home/dzack/.plannotator/plans/recovery-plan-repair-damaged-r-2026-03-19-approved.md)
 
-Additional Claude plan files under `/home/dzack/.claude/plans/` were reviewed in the earlier audit phase and then removed during cleanup. The retired repo-local `CONTINUATION_TRIAGE.md` handoff was also removed after its decisions were folded into this file.
+Additional Claude plan files under `/home/dzack/.claude/plans/` were reviewed in the earlier audit phase and then removed during cleanup. The retired repo-local `CONTINUATION_TRIAGE.md` handoff and the stale Zotero subrepo continuation were also removed after their decisions were folded into this file.
 
 ## Canonical CI Templates
 

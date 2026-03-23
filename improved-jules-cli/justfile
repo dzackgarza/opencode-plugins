@@ -49,5 +49,3 @@ test:
     set -euo pipefail
     echo "No tests directory found in {{repo_root}}. Add tests before enabling the quality-control gate." >&2
     exit 1
-
-check: test
