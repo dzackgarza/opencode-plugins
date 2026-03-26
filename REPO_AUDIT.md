@@ -1,1 +1,1 @@
-/home/dzack/ai/skills/opencode-plugin-development/AUDIT.md
+/home/dzack/ai/opencode/skills/opencode-plugin-development/references/AUDIT.md

@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencode.ai/schemas/agent-input.json",
+  "title": "OpenCode Agent Input Schema (Permission Manager)",
+  "description": "Input schema for agent markdown files processed by the permission manager. The permission_tags and permission_overrides fields are compiled into the standard permission field for OpenCode compliance.",
+  "type": "object",
+  "properties": {
+    "description": {
+      "type": "string",
+      "description": "Description of when to use the agent"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["subagent", "primary", "all"],
+      "description": "Determines how the agent can be used"
+    },
+    "model": {
+      "type": "string",
+      "description": "Model ID"
+    },
+    "variant": {
+      "type": "string",
+      "description": "Default model variant"
+    },
+    "temperature": {
+      "type": "number",
+      "description": "Controls randomness"
+    },
+    "top_p": {
+      "type": "number",
+      "description": "Nucleus sampling"
+    },
+    "steps": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum agentic iterations"
+    },
+    "maxSteps": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "DEPRECATED: Use 'steps'"
+    },
+    "disable": {
+      "type": "boolean",
+      "description": "Disable the agent"
+    },
+    "hidden": {
+      "type": "boolean",
+      "description": "Hide from @ autocomplete"
+    },
+    "color": {
+      "oneOf": [
+        { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$" },
+        {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "accent",
+            "success",
+            "warning",
+            "error",
+            "info"
+          ]
+        }
+      ],
+      "description": "Hex color or theme color"
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Path to custom prompt file"
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" },
+      "description": "DEPRECATED: Use 'permission'"
+    },
+    "permission": {
+      "type": "object",
+      "description": "Direct permission rules (alternative to permission_tags)"
+    },
+    "permission_tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Tag-based permission composition. Valid tags: orchestrator, session_tools, bash_unrestricted, bash_standard, planner, code_writer, test_writer, docs_writer, reviewer, researcher, interactive, coordinator"
+    },
+    "permission_overrides": {
+      "type": "object",
+      "description": "Final permission overrides applied after tag resolution"
+    }
+  },
+  "additionalProperties": {
+    "description": "Provider-specific options"
+  }
+}
