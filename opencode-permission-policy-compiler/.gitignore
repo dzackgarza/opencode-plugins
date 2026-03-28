@@ -1,0 +1,11 @@
+.coverage
+.serena/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+codeql-db/
+codeql-report.sarif
+coverage.xml
+src/**/__pycache__/
+tests/**/__pycache__/
