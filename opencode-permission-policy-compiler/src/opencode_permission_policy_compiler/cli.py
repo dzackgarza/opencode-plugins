@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import yaml
 from cyclopts import App
 from pydantic import validate_call
 
@@ -48,6 +49,20 @@ def compile_agent() -> None:
     base_permissions = load_global_permission_base()
     known_policies = load_known_policies()
     sys.stdout.write(compile_markdown_agent(source, base_permissions, known_policies))
+
+
+@app.command
+@validate_call
+def list_policies() -> None:
+    """Print the resolved policy catalog."""
+    sys.stdout.write(
+        yaml.safe_dump(
+            load_known_policies(),
+            allow_unicode=True,
+            default_flow_style=False,
+            sort_keys=False,
+        )
+    )
 
 
 @app.command

@@ -548,6 +548,22 @@ def test_set_global_policy_overwrites_permission_and_preserves_other_global_conf
     assert rewritten["formatter"] == {"format": "json"}
 
 
+def test_list_policies_prints_resolved_policy_map(tmp_path: Path) -> None:
+    xdg_config_home = tmp_path / "xdg-config"
+    install_policy_config(xdg_config_home)
+
+    result = run_cli(
+        "",
+        "list-policies",
+        home=tmp_path,
+        xdg_config_home=xdg_config_home,
+    )
+
+    listed = yaml.safe_load(result.stdout)
+    assert result.returncode == 0, result.stderr
+    assert listed == cast(dict[str, object], read_policy_config()["policies"])
+
+
 def test_set_global_policy_replaces_previous_external_directory_rules_with_policy_payload(
     tmp_path: Path,
 ) -> None:

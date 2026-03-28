@@ -6,10 +6,26 @@ Compile OpenCode markdown agents that use a custom `policies:` frontmatter list 
 
 ```bash
 cat agent.md | uv run opencode-permission-policy-compiler > compiled-agent.md
+uv run opencode-permission-policy-compiler list-policies
 uv run opencode-permission-policy-compiler install-config
 uv run opencode-permission-policy-compiler set-global-policy global
 uv run opencode-permission-policy-compiler doctor
 ```
+
+## Published Prompt Workflow
+
+On this system, source `~/.envrc` first so `$AGENTS_DIR` is available in the shell.
+
+```bash
+source ~/.envrc
+uvx --from git+https://github.com/dzackgarza/ai-prompts.git ai-prompts get sub-agents/prover \
+  | uv run opencode-permission-policy-compiler \
+  > "$AGENTS_DIR/prover.md"
+```
+
+This workflow fetches the policy-free published prompt, compiles it into standard
+OpenCode markdown with the subagent permission overlay, and writes the final agent file
+into the local agents directory.
 
 ## Behavior
 
@@ -28,6 +44,7 @@ uv run opencode-permission-policy-compiler doctor
 - Emits only the minimal agent-local `permission:` overlay needed to reproduce the requested policy outcome
 - Removes the custom `policies:` field from output
 - `install-config` writes a new XDG policy TOML for this CLI by discovering the live OpenCode tool inventory and configured MCP tools
+- `list-policies` prints the resolved CLI policy catalog as a simple name-to-permission map
 - `set-global-policy <policy>` rewrites the live `~/.config/opencode/opencode.json` top-level `permission` block with the permissions defined by the named CLI policy while preserving unrelated top-level config keys
 - `doctor` validates the XDG policy TOML, compares this CLI's `policies.global` against the live OpenCode `permission` block, probes the configured/default OpenCode server health/tool-ID endpoints, and reports how the global CLI policy differs from live OpenCode permissions
 
