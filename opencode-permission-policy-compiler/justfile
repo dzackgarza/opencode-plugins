@@ -11,32 +11,14 @@ install:
     cd "{{repo_root}}"
     exec uv sync --group dev
 
-[private]
-_format:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd "{{repo_root}}"
-    exec uv run ruff format .
-
-[private]
-_lint:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd "{{repo_root}}"
-    exec uv run ruff check .
-
-[private]
-_typecheck:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd "{{repo_root}}"
-    exec uv run basedpyright
-
-[private]
-_quality-control:
+test:
     #!/usr/bin/env bash
     set -euo pipefail
     cd "{{repo_root}}"
     exec just --justfile "{{python_qc_justfile}}" --working-directory "{{repo_root}}" test
 
-test: _lint _typecheck _quality-control
+test-ci:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{repo_root}}"
+    exec just --justfile "{{python_qc_justfile}}" --working-directory "{{repo_root}}" test-ci

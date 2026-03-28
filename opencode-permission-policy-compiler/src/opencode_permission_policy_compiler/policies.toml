@@ -1,0 +1,6 @@
+[policies.subagents]
+task = "deny"
+question = "deny"
+submit_plan = "deny"
+plannotator_review = "deny"
+plannotator_annotate = "deny"
