@@ -116,6 +116,7 @@ def compute_minimal_permission_overlay(
         delta = _compute_permission_delta(key, value, base_permissions)
         if delta is not None:
             minimal[key] = delta
+    _preserve_scalar_tool_exceptions_against_default(minimal, effective)
 
     return minimal
 
@@ -129,6 +130,7 @@ def compute_minimal_global_permissions(
         minimized = _compute_global_permission_minimal_entry(key, value)
         if minimized is not None:
             minimal[key] = minimized
+    _preserve_scalar_tool_exceptions_against_default(minimal, policy_permissions)
     return minimal
 
 
@@ -175,6 +177,25 @@ def _compute_global_permission_minimal_entry(
     if not minimized_rules:
         return None
     return minimized_rules
+
+
+def _preserve_scalar_tool_exceptions_against_default(
+    minimal: dict[str, PermissionRule],
+    effective: dict[str, PermissionRule],
+) -> None:
+    effective_default = effective.get(GLOBAL_PERMISSION_DEFAULT_KEY)
+    if not isinstance(effective_default, str):
+        return
+
+    if minimal.get(GLOBAL_PERMISSION_DEFAULT_KEY) != effective_default:
+        return
+
+    for key, value in effective.items():
+        if key == GLOBAL_PERMISSION_DEFAULT_KEY or key in NON_TOOL_PERMISSION_KEYS:
+            continue
+        if isinstance(value, dict) or value == effective_default or key in minimal:
+            continue
+        minimal[key] = deepcopy(value)
 
 
 @cache

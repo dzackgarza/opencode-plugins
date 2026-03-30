@@ -77,6 +77,14 @@ def compute_minimal_global_permissions_for_test(
         }
         if minimized_rules:
             minimal[key] = minimized_rules
+    effective_default = policy_permissions.get("*")
+    if isinstance(effective_default, str) and minimal.get("*") == effective_default:
+        for key, value in policy_permissions.items():
+            if key in {"*", "external_directory", "doom_loop"}:
+                continue
+            if not isinstance(value, str) or value == effective_default or key in minimal:
+                continue
+            minimal[key] = value
     return minimal
 
 
@@ -265,7 +273,8 @@ def build_policy_config(
         if isinstance(value, dict):
             deferred_tables.append((key, cast(dict[str, str], value)))
             continue
-        lines.append(f'{key} = "{value}"')
+        rendered_key = json.dumps(key) if not key.isidentifier() else key
+        lines.append(f"{rendered_key} = {json.dumps(value)}")
     for key, value in deferred_tables:
         lines.extend(
             [
@@ -539,6 +548,45 @@ Preserve scoped allow exceptions.
     assert body == "Preserve scoped allow exceptions.\n"
 
 
+def test_cli_preserves_scalar_allow_exceptions_under_deny_wildcard(
+    tmp_path: Path,
+) -> None:
+    xdg_config_home = tmp_path / "xdg-config"
+    write_global_config(
+        tmp_path,
+        {
+            "read": "allow",
+            "task": "allow",
+            "todowrite": "allow",
+        },
+    )
+    install_policy_config(xdg_config_home)
+    source = """---
+name: Restricted Agent
+mode: primary
+description: Preserve scalar allow exceptions under deny wildcard
+permission:
+  "*": deny
+  read: allow
+  task: allow
+  todowrite: allow
+---
+Preserve scalar allow exceptions.
+"""
+
+    result = run_cli(source, home=tmp_path, xdg_config_home=xdg_config_home)
+
+    assert result.returncode == 0, result.stderr
+    metadata, body = parse_output(result.stdout)
+    assert metadata["permission"] == {
+        "*": "deny",
+        "read": "allow",
+        "task": "allow",
+        "todowrite": "allow",
+    }
+    assert body == "Preserve scalar allow exceptions.\n"
+
+
 def test_cli_rejects_unknown_policy_without_emitting_compiled_markdown(tmp_path: Path) -> None:
     xdg_config_home = tmp_path / "xdg-config"
     write_global_config(tmp_path, REPRESENTATIVE_GLOBAL_PERMISSION)
@@ -745,6 +793,42 @@ def test_set_global_policy_preserves_allow_exceptions_under_deny_wildcards(
             "git": "allow",
             "git *": "allow",
         },
+    }
+
+
+def test_set_global_policy_preserves_scalar_allow_exceptions_under_deny_wildcard(
+    tmp_path: Path,
+) -> None:
+    xdg_config_home = tmp_path / "xdg-config"
+    install_policy_config(
+        xdg_config_home,
+        content=build_policy_config(
+            global_policy={
+                "*": "deny",
+                "read": "allow",
+                "task": "allow",
+                "todowrite": "allow",
+            }
+        ),
+    )
+    write_global_payload(tmp_path, {"permission": {"read": "allow"}})
+
+    result = run_cli(
+        "",
+        "set-global-policy",
+        "global",
+        home=tmp_path,
+        xdg_config_home=xdg_config_home,
+    )
+
+    rewritten = read_global_config(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert rewritten["permission"] == {
+        "*": "deny",
+        "read": "allow",
+        "task": "allow",
+        "todowrite": "allow",
     }
 
 
