@@ -4,7 +4,6 @@ import contextlib
 import json
 import re
 import subprocess
-import sys
 import tomllib
 from collections.abc import Iterator
 from copy import deepcopy
@@ -60,6 +59,27 @@ SUBAGENT_POLICY_EFFECTIVE: dict[str, str] = {
 }
 
 
+def compute_minimal_global_permissions_for_test(
+    policy_permissions: dict[str, object],
+) -> dict[str, object]:
+    minimal: dict[str, object] = {}
+    for key, value in policy_permissions.items():
+        default_action = "ask" if key in {"external_directory", "doom_loop"} else "allow"
+        if isinstance(value, str):
+            if value != default_action:
+                minimal[key] = value
+            continue
+        assert isinstance(value, dict)
+        minimized_rules = {
+            inner_key: inner_value
+            for inner_key, inner_value in value.items()
+            if inner_value != default_action
+        }
+        if minimized_rules:
+            minimal[key] = minimized_rules
+    return minimal
+
+
 def run_cli(
     markdown_text: str,
     *args: str,
@@ -72,7 +92,7 @@ def run_cli(
     if xdg_config_home is not None:
         env["XDG_CONFIG_HOME"] = str(xdg_config_home)
     return subprocess.run(
-        [sys.executable, "-m", "opencode_permission_policy_compiler", *args],
+        ["uv", "run", "python", "-m", "opencode_permission_policy_compiler", *args],
         input=markdown_text,
         text=True,
         capture_output=True,
@@ -142,7 +162,7 @@ report = build_doctor_report(
 print(report.model_dump_json())
 """
     result = subprocess.run(
-        [sys.executable, "-c", script],
+        ["uv", "run", "python", "-c", script],
         text=True,
         capture_output=True,
         cwd=REPO_ROOT,
@@ -231,7 +251,7 @@ def read_policy_config() -> dict[str, object]:
 
 def build_policy_config(
     *,
-    global_policy: dict[str, str],
+    global_policy: dict[str, object],
     mcps: list[str] | None = None,
 ) -> str:
     lines = [
@@ -239,16 +259,36 @@ def build_policy_config(
         f"servers = {json.dumps(sorted(mcps or []))}",
         "",
         "[policies.global]",
-        *[f'{key} = "{value}"' for key, value in global_policy.items()],
-        "",
-        "[policies.subagents]",
-        'task = "deny"',
-        'question = "deny"',
-        'submit_plan = "deny"',
-        'plannotator_review = "deny"',
-        'plannotator_annotate = "deny"',
-        "",
     ]
+    deferred_tables: list[tuple[str, dict[str, str]]] = []
+    for key, value in global_policy.items():
+        if isinstance(value, dict):
+            deferred_tables.append((key, cast(dict[str, str], value)))
+            continue
+        lines.append(f'{key} = "{value}"')
+    for key, value in deferred_tables:
+        lines.extend(
+            [
+                "",
+                f"[policies.global.{key}]",
+                *[
+                    f"{json.dumps(inner_key)} = {json.dumps(inner_value)}"
+                    for inner_key, inner_value in value.items()
+                ],
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "[policies.subagents]",
+            'task = "deny"',
+            'question = "deny"',
+            'submit_plan = "deny"',
+            'plannotator_review = "deny"',
+            'plannotator_annotate = "deny"',
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -423,6 +463,42 @@ def test_cli_omits_permission_block_when_global_baseline_already_matches_subagen
     assert body == parse_output(source)[1]
 
 
+def test_cli_treats_missing_global_entries_as_runtime_defaults_when_minimizing(
+    tmp_path: Path,
+) -> None:
+    xdg_config_home = tmp_path / "xdg-config"
+    write_global_config(
+        tmp_path,
+        {
+            "invalid": "deny",
+        },
+    )
+    install_policy_config(xdg_config_home)
+    source = """---
+name: Default-Allow Agent
+mode: primary
+description: Explicit allow should collapse against runtime defaults
+permission:
+  read: allow
+  external_directory:
+    "*": ask
+    "/tmp/*": allow
+---
+Use runtime-default-aware minimization.
+"""
+
+    result = run_cli(source, home=tmp_path, xdg_config_home=xdg_config_home)
+
+    assert result.returncode == 0, result.stderr
+    metadata, body = parse_output(result.stdout)
+    assert metadata["permission"] == {
+        "external_directory": {
+            "/tmp/*": "allow",
+        }
+    }
+    assert body == "Use runtime-default-aware minimization.\n"
+
+
 def test_cli_rejects_unknown_policy_without_emitting_compiled_markdown(tmp_path: Path) -> None:
     xdg_config_home = tmp_path / "xdg-config"
     write_global_config(tmp_path, REPRESENTATIVE_GLOBAL_PERMISSION)
@@ -535,9 +611,8 @@ def test_set_global_policy_overwrites_permission_and_preserves_other_global_conf
         xdg_config_home=xdg_config_home,
     )
 
-    expected_permission = cast(
-        dict[str, object],
-        cast(dict[str, object], read_policy_config()["policies"])["global"],
+    expected_permission = compute_minimal_global_permissions_for_test(
+        cast(dict[str, object], cast(dict[str, object], read_policy_config()["policies"])["global"])
     )
     rewritten = read_global_config(tmp_path)
 
@@ -546,6 +621,45 @@ def test_set_global_policy_overwrites_permission_and_preserves_other_global_conf
     assert rewritten["permission"] == expected_permission
     assert rewritten["model"] == "openrouter/some-model"
     assert rewritten["formatter"] == {"format": "json"}
+
+
+def test_set_global_policy_omits_default_allow_entries_and_default_ask_rules(
+    tmp_path: Path,
+) -> None:
+    xdg_config_home = tmp_path / "xdg-config"
+    install_policy_config(
+        xdg_config_home,
+        content=build_policy_config(
+            global_policy={
+                "read": "allow",
+                "question": "deny",
+                "doom_loop": "ask",
+                "external_directory": {
+                    "*": "ask",
+                    "/tmp/*": "allow",
+                },
+            }
+        ),
+    )
+    write_global_payload(tmp_path, {"permission": {"read": "deny"}})
+
+    result = run_cli(
+        "",
+        "set-global-policy",
+        "global",
+        home=tmp_path,
+        xdg_config_home=xdg_config_home,
+    )
+
+    rewritten = read_global_config(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert rewritten["permission"] == {
+        "question": "deny",
+        "external_directory": {
+            "/tmp/*": "allow",
+        },
+    }
 
 
 def test_list_policies_prints_resolved_policy_map(tmp_path: Path) -> None:
@@ -618,7 +732,7 @@ def test_doctor_reports_applied_global_policy_live_tool_coverage_and_non_tool_pe
         write_global_payload(
             tmp_path,
             {
-                "permission": global_policy,
+                "permission": compute_minimal_global_permissions_for_test(global_policy),
                 "server": {
                     "hostname": "127.0.0.1",
                     "port": server.server_port,
@@ -762,13 +876,9 @@ def test_doctor_renders_global_policy_differences_explicitly(tmp_path: Path) -> 
         report = run_doctor_report(tmp_path, xdg_config_home)
 
     assert report["global_policy_applied"] is False
-    assert report["policy_only_permissions"] == ["doom_loop", "task"]
-    assert report["current_only_permissions"] == ["question"]
-    mismatches = [
-        (item["name"], item["policy_value"], item["current_value"])
-        for item in cast(list[dict[str, object]], report["mismatched_permissions"])
-    ]
-    assert mismatches == [("external_directory", "ask", {"*": "ask", "/tmp/*": "allow"})]
+    assert report["policy_only_permissions"] == []
+    assert report["current_only_permissions"] == ["external_directory", "question", "read"]
+    assert report["mismatched_permissions"] == []
 
 
 def test_doctor_includes_configured_mcp_tools_in_active_tool_inventory(tmp_path: Path) -> None:
@@ -789,12 +899,14 @@ def test_doctor_includes_configured_mcp_tools_in_active_tool_inventory(tmp_path:
         write_global_payload(
             tmp_path,
             {
-                "permission": {
-                    "read": "allow",
-                    "cut-copy-paste-mcp_copy_lines": "allow",
-                    "external_directory": "ask",
-                    "doom_loop": "ask",
-                },
+                "permission": compute_minimal_global_permissions_for_test(
+                    {
+                        "read": "allow",
+                        "cut-copy-paste-mcp_copy_lines": "allow",
+                        "external_directory": "ask",
+                        "doom_loop": "ask",
+                    }
+                ),
                 "server": {
                     "hostname": "127.0.0.1",
                     "port": server.server_port,
@@ -844,12 +956,14 @@ def test_doctor_flags_cli_global_permissions_that_do_not_correspond_to_known_act
         write_global_payload(
             tmp_path,
             {
-                "permission": {
-                    "read": "allow",
-                    "imaginary_tool": "allow",
-                    "external_directory": "ask",
-                    "doom_loop": "ask",
-                },
+                "permission": compute_minimal_global_permissions_for_test(
+                    {
+                        "read": "allow",
+                        "imaginary_tool": "allow",
+                        "external_directory": "ask",
+                        "doom_loop": "ask",
+                    }
+                ),
                 "server": {
                     "hostname": "127.0.0.1",
                     "port": server.server_port,

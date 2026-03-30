@@ -24,6 +24,7 @@ from .logic import (
     build_doctor_report,
     build_install_config_text,
     compile_markdown_agent,
+    compute_minimal_global_permissions,
     doctor_exit_code,
     enabled_mcp_server_names,
     render_doctor_report,
@@ -75,7 +76,9 @@ def set_global_policy(policy: str) -> None:
         known_policies=known_policies,
         base_permissions={},
     )
-    written_path = write_global_permission_base(resolved_permissions)
+    written_path = write_global_permission_base(
+        compute_minimal_global_permissions(resolved_permissions)
+    )
     sys.stdout.write(f"{Path(written_path).expanduser()}\n")
 
 

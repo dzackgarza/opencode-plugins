@@ -119,13 +119,25 @@ def compute_minimal_permission_overlay(
     return minimal
 
 
+@validate_call
+def compute_minimal_global_permissions(
+    policy_permissions: dict[str, PermissionRule],
+) -> dict[str, PermissionRule]:
+    minimal: dict[str, PermissionRule] = {}
+    for key, value in policy_permissions.items():
+        minimized = _compute_global_permission_minimal_entry(key, value)
+        if minimized is not None:
+            minimal[key] = minimized
+    return minimal
+
+
 def _compute_permission_delta(
     key: str,
     value: PermissionRule,
     base_permissions: dict[str, PermissionRule],
 ) -> PermissionRule | None:
     if key not in base_permissions:
-        return deepcopy(value)
+        return _compute_global_permission_minimal_entry(key, value)
 
     base_value = base_permissions[key]
     if value == base_value:
@@ -136,6 +148,26 @@ def _compute_permission_delta(
         return delta or None
 
     return deepcopy(value)
+
+
+def _compute_global_permission_minimal_entry(
+    key: str,
+    value: PermissionRule,
+) -> PermissionRule | None:
+    default_action = NON_TOOL_PERMISSION_DEFAULTS.get(key, "allow")
+    if isinstance(value, str):
+        if value == default_action:
+            return None
+        return value
+
+    minimized_rules = {
+        inner_key: inner_value
+        for inner_key, inner_value in value.items()
+        if inner_value != default_action
+    }
+    if not minimized_rules:
+        return None
+    return minimized_rules
 
 
 def _compute_rule_map_delta(
@@ -329,7 +361,10 @@ def _global_policy_application_status(
     if current_permissions is None:
         msg = "OpenCode global permission block is unavailable"
         return None, msg
-    return current_permissions == global_policy_permissions, None
+    return (
+        current_permissions == compute_minimal_global_permissions(global_policy_permissions),
+        None,
+    )
 
 
 def _global_policy_difference_statuses(
@@ -340,16 +375,18 @@ def _global_policy_difference_statuses(
     if current_permissions is None or global_policy_permissions is None:
         return [], [], []
 
-    policy_only_permissions = sorted(set(global_policy_permissions) - set(current_permissions))
-    current_only_permissions = sorted(set(current_permissions) - set(global_policy_permissions))
+    applied_global_permissions = compute_minimal_global_permissions(global_policy_permissions)
+
+    policy_only_permissions = sorted(set(applied_global_permissions) - set(current_permissions))
+    current_only_permissions = sorted(set(current_permissions) - set(applied_global_permissions))
     mismatched_permissions = [
         PermissionMismatchStatus(
             name=name,
-            policy_value=deepcopy(global_policy_permissions[name]),
+            policy_value=deepcopy(applied_global_permissions[name]),
             current_value=deepcopy(current_permissions[name]),
         )
-        for name in sorted(set(global_policy_permissions) & set(current_permissions))
-        if global_policy_permissions[name] != current_permissions[name]
+        for name in sorted(set(applied_global_permissions) & set(current_permissions))
+        if applied_global_permissions[name] != current_permissions[name]
     ]
     return policy_only_permissions, current_only_permissions, mismatched_permissions
 
@@ -456,7 +493,7 @@ def _global_policy_application_line(report: DoctorReportDocument) -> str:
     if report.global_policy_applied is False:
         return (
             "  global policy reflected in OpenCode permissions: ERROR live OpenCode "
-            "permissions do not match CLI policies.global"
+            "permissions do not match the minimized applied form of CLI policies.global"
         )
     return (
         "  global policy reflected in OpenCode permissions: unavailable "
