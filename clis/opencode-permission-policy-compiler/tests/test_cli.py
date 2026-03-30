@@ -499,6 +499,46 @@ Use runtime-default-aware minimization.
     assert body == "Use runtime-default-aware minimization.\n"
 
 
+def test_cli_preserves_allow_exceptions_under_deny_wildcards(
+    tmp_path: Path,
+) -> None:
+    xdg_config_home = tmp_path / "xdg-config"
+    write_global_config(tmp_path, {"read": "allow"})
+    install_policy_config(xdg_config_home)
+    source = """---
+name: Scoped Agent
+mode: primary
+description: Preserve allow exceptions under deny wildcard
+permission:
+  edit:
+    "*": deny
+    ".agents/*": allow
+  bash:
+    "*": deny
+    "git": allow
+    "git *": allow
+---
+Preserve scoped allow exceptions.
+"""
+
+    result = run_cli(source, home=tmp_path, xdg_config_home=xdg_config_home)
+
+    assert result.returncode == 0, result.stderr
+    metadata, body = parse_output(result.stdout)
+    assert metadata["permission"] == {
+        "edit": {
+            "*": "deny",
+            ".agents/*": "allow",
+        },
+        "bash": {
+            "*": "deny",
+            "git": "allow",
+            "git *": "allow",
+        },
+    }
+    assert body == "Preserve scoped allow exceptions.\n"
+
+
 def test_cli_rejects_unknown_policy_without_emitting_compiled_markdown(tmp_path: Path) -> None:
     xdg_config_home = tmp_path / "xdg-config"
     write_global_config(tmp_path, REPRESENTATIVE_GLOBAL_PERMISSION)
@@ -658,6 +698,52 @@ def test_set_global_policy_omits_default_allow_entries_and_default_ask_rules(
         "question": "deny",
         "external_directory": {
             "/tmp/*": "allow",
+        },
+    }
+
+
+def test_set_global_policy_preserves_allow_exceptions_under_deny_wildcards(
+    tmp_path: Path,
+) -> None:
+    xdg_config_home = tmp_path / "xdg-config"
+    install_policy_config(
+        xdg_config_home,
+        content=build_policy_config(
+            global_policy={
+                "edit": {
+                    "*": "deny",
+                    ".agents/*": "allow",
+                },
+                "bash": {
+                    "*": "deny",
+                    "git": "allow",
+                    "git *": "allow",
+                },
+            }
+        ),
+    )
+    write_global_payload(tmp_path, {"permission": {"read": "allow"}})
+
+    result = run_cli(
+        "",
+        "set-global-policy",
+        "global",
+        home=tmp_path,
+        xdg_config_home=xdg_config_home,
+    )
+
+    rewritten = read_global_config(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert rewritten["permission"] == {
+        "edit": {
+            "*": "deny",
+            ".agents/*": "allow",
+        },
+        "bash": {
+            "*": "deny",
+            "git": "allow",
+            "git *": "allow",
         },
     }
 

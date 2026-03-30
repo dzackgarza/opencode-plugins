@@ -6,6 +6,7 @@ import shlex
 import subprocess
 import sys
 from copy import deepcopy
+from functools import cache
 from typing import cast
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
@@ -160,14 +161,55 @@ def _compute_global_permission_minimal_entry(
             return None
         return value
 
-    minimized_rules = {
-        inner_key: inner_value
-        for inner_key, inner_value in value.items()
-        if inner_value != default_action
-    }
+    minimized_rules: dict[str, PermissionAction] = {}
+    prior_non_default_patterns: list[str] = []
+    for inner_key, inner_value in value.items():
+        if inner_value != default_action:
+            minimized_rules[inner_key] = inner_value
+            prior_non_default_patterns.append(inner_key)
+            continue
+        if any(
+            _wildcard_patterns_overlap(pattern, inner_key) for pattern in prior_non_default_patterns
+        ):
+            minimized_rules[inner_key] = inner_value
     if not minimized_rules:
         return None
     return minimized_rules
+
+
+@cache
+def _wildcard_patterns_overlap(first_pattern: str, second_pattern: str) -> bool:
+    @cache
+    def overlap(first_index: int, second_index: int) -> bool:
+        if first_index == len(first_pattern):
+            return all(char == "*" for char in second_pattern[second_index:])
+        if second_index == len(second_pattern):
+            return all(char == "*" for char in first_pattern[first_index:])
+
+        first_char = first_pattern[first_index]
+        second_char = second_pattern[second_index]
+
+        if first_char == "*" and second_char == "*":
+            return (
+                overlap(first_index + 1, second_index)
+                or overlap(first_index, second_index + 1)
+                or overlap(first_index + 1, second_index + 1)
+            )
+        if first_char == "*":
+            return overlap(first_index + 1, second_index) or overlap(
+                first_index,
+                second_index + 1,
+            )
+        if second_char == "*":
+            return overlap(first_index, second_index + 1) or overlap(
+                first_index + 1,
+                second_index,
+            )
+        if first_char != second_char:
+            return False
+        return overlap(first_index + 1, second_index + 1)
+
+    return overlap(0, 0)
 
 
 def _compute_rule_map_delta(
